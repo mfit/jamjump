@@ -58,11 +58,14 @@ Menu.prototype = {
         x += 100;
       }
     }
-
-
   },
 
   update: function() {
+    if (this.game.first_start == true) {
+        this.game.first_start = false;
+        this.game.state.start('test');
+    }
+
     // if (this.game.input.keyboard.isDown(Phaser.Keyboard.ENTER)) {
     //   this.game.state.start('play');
     // }

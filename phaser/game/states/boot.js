@@ -11,11 +11,10 @@ Boot.prototype = {
   },
   create: function() {
     this.game.input.maxPointers = 1;
+    this.game.first_start = true;
+    this.game.scale.startFullScreen(true);
     this.game.state.start('preload');
       
-    this.game.scale.startFullScreen(false);
-      
-
   }
 };
 
