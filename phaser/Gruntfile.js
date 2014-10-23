@@ -16,8 +16,37 @@ var mountFolder = function (connect, dir) {
 module.exports = function (grunt) {
   // load all grunt tasks
   require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
+  var path = require('path');
+ 
+  // https://gist.github.com/cowboy/3819170
+  grunt.registerMultiTask('subgrunt', 'Run a sub-project\'s grunt tasks.', function() {
+    if (!grunt.file.exists(this.data.subdir)) {
+      grunt.log.error('Directory "' + this.data.subdir + '" not found.');
+      return false;
+    }
+    var done = this.async();
+    var subdir = path.resolve(this.data.subdir);
+    grunt.util.spawn({
+      cmd: 'grunt',
+      args: this.data.args || [],
+      opts: {cwd: subdir},
+    }, function(error, result, code) {
+      if (code === 127) {
+        grunt.log.error('Error running sub-grunt. Did you run "npm install" in the sub-project?');
+      } else {
+        grunt.log.writeln('\n' + result.stdout);
+      }
+      done(code === 0);
+    });
+  });
 
   grunt.initConfig({
+    subgrunt: {
+        phaser: {
+            subdir: './phaser/',
+            args: ['build'],
+        },
+    },
     watch: {
       scripts: {
         files: [
@@ -60,6 +89,7 @@ module.exports = function (grunt) {
           // includes files within path and its sub-directories
           { expand: true, src: ['assets/**'], dest: 'dist/' },
           { expand: true, flatten: true, src: ['game/plugins/*.js'], dest: 'dist/js/plugins/' },
+          { expand: true, flatten: true, src: ['phaser/dist/*.js'], dest: 'dist/js/' },
           { expand: true, flatten: true, src: ['bower_components/**/dist/*.js'], dest: 'dist/js/' },
           { expand: true, src: ['css/**'], dest: 'dist/' },
           { expand: true, src: ['index.html'], dest: 'dist/' }
@@ -75,6 +105,7 @@ module.exports = function (grunt) {
   });
 
   grunt.registerTask('build', ['buildBootstrapper', 'browserify','copy']);
+  grunt.registerTask('phaser', ['subgrunt']);
   grunt.registerTask('serve', ['build', 'connect:livereload', 'open', 'watch']);
   grunt.registerTask('default', ['serve']);
   grunt.registerTask('prod', ['build', 'copy']);

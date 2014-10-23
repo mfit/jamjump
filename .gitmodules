@@ -1,0 +1,3 @@
+[submodule "phaser/phaser"]
+	path = phaser/phaser
+	url = git://github.com/mfpi/phaser
