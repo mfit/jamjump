@@ -3,6 +3,17 @@ jamjump
 
 Gamejam Graz 2014 II Entry
 
+## Installation
+git clone https://github.com/mfit/jamjump
+cd jamjump
+git checkout devbranch
+git submodule init
+git submodule update
+cd phaser
+(cd phaser && npm install)
+npm install
+grunt serve
+
 ## Authors
 
 ### Graphics
