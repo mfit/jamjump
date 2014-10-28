@@ -40,7 +40,16 @@ module.exports = function (grunt) {
     });
   });
 
+  grunt.loadNpmTasks('grunt-contrib-coffee');
+
   grunt.initConfig({
+    coffee: {
+        compile: {
+            files: {
+                'game/frp/behavior2.js': 'game/frp/behavior2.coffee',
+            }
+        }
+    },
     subgrunt: {
         phaser: {
             subdir: './phaser/',
@@ -51,7 +60,10 @@ module.exports = function (grunt) {
       scripts: {
         files: [
             'game/**/*.js',
+            'game/**/*.coffee',
+            'game/**/*/*.js',
             'assets/levels/*.txt',
+            'assets/levels/*.json',
             '!game/main.js'
         ],
         options: {
@@ -103,8 +115,9 @@ module.exports = function (grunt) {
       }
     }
   });
+    
 
-  grunt.registerTask('build', ['buildBootstrapper', 'browserify','copy']);
+  grunt.registerTask('build', ['coffee', 'buildBootstrapper', 'browserify','copy']);
   grunt.registerTask('phaser', ['subgrunt']);
   grunt.registerTask('serve', ['build', 'connect:livereload', 'open', 'watch']);
   grunt.registerTask('default', ['serve']);

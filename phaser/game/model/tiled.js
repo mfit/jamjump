@@ -27,12 +27,100 @@ TiledLoader.prototype.create = function(adder) {
     
     for (var layer_id in this.layer_names) {
         var layer_name = this.layer_names[layer_id];
-        this.layers[layer_name] = tiled_map.createLayer(layer_name);
-        console.log(this.layers[layer_name]);
+        //this.layers[layer_name] = tiled_map.createLayer(layer_name);
+        console.log(tiled_map);
     }
+    
+    this.tiled_map = tiled_map;
     
     return tiled_map;
 }
 
-module.exports = TiledLoader;
+TiledLoader.prototype.runInterpreter = function (interpreter) {
+    for (var layerId in this.tiled_map.layers) {
+        var layer = this.tiled_map.layers[layerId];
+        var layerInterpreter = interpreter.getLayerInterpreter(layer)
+        for (var y = 0; y < layer.data.length; y++) {
+            for (var x = 0; x < layer.data[y].length; x++) {
+                layerInterpreter.makeTile(x, y, layer.data[y][x]);
+            }
+        }
+    }
+}
+
+function TiledInterpreter() {
+}
+
+TiledInterpreter.prototype.getLayerInterpreter = function (layer) {
+}
+
+function LayerInterpreter() {
+}
+
+LayerInterpreter.prototype.makeTile = function (x, y, tile) {
+}
+    
+function BaseInterpreter(worldBlocks) {
+    this.wb = worldBlocks;
+}
+
+BaseInterpreter.prototype = new TiledInterpreter();
+BaseInterpreter.prototype.getLayerInterpreter = function (layer) {
+    if (layer.name == "BlockLayer") {
+        return new BlockLayerInterpreter(this);
+    }
+}
+
+function BlockLayerInterpreter(baseInterpreter) {
+    this.wb = baseInterpreter.wb;
+}
+BlockLayerInterpreter.prototype = new LayerInterpreter();
+BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
+    if (tile.properties.hasOwnProperty('type')) {
+        switch (tile.properties['type']) {
+            case 'DefaultBlock':
+                this.wb.addBlock(x, y);
+                break;
+            default:
+                this.wb.addBlock(x, y, tile.properties['type']);
+                break;
+        }
+    }
+}
+
+LoadTiledAtlas = function (game, tilemap) {
+    for (var setIndex = 0; setIndex < tilemap.tilesets.length; setIndex++) {
+        var set = tilemap.tilesets[setIndex];
+        var frames = [];
+        for (var gid = set.firstgid; gid < set.firstgid + set.total; gid++) {
+            var frame = {
+                filename: gid.toString(),
+                frame: {x: set.drawCoords[gid][0], y:set.drawCoords[gid][1], w:set.tileWidth, h:set.tileHeight},
+                rotated:false,
+                trimmed:true,
+                spriteSourceSize: {x:0, y:0, w:set.tileWidth, h:set.tileHeight},
+                sourceSize: {w:set.tileWidth, h:set.tileHeight},
+            }
+            frames.push(frame);
+        }
+        console.log(frames);
+        game.load.atlas("test", "assets/spritesheet.png", null, {frames:frames}, Phaser.Loader.TEXTURE_ATLAS_JSON_ARRAY);
+    }
+}
+
+MakeObjectLayerSprites = function (game, tilemap, layerName) {
+    var objectData = tilemap.objects[layerName];
+    for (var i = 0; i < objectData.length; i++) {
+        var objectGid = objectData[i].gid
+        var tilesetIndex = tilemap.tiles[objectGid][2];
+        var set = tilemap.tilesets[tilesetIndex];
+        var sprite = game.add.tileSprite(objectData[i].x, objectData[i].y, set.tileWidth, set.tileHeight, "test", objectGid);
+        return sprite;
+    }
+}
+
+module.exports.TiledLoader = TiledLoader;
+module.exports.LoadTiledAtlas = LoadTiledAtlas;
+module.exports.MakeObjectLayerSprites = MakeObjectLayerSprites;
+module.exports.BaseInterpreter = BaseInterpreter;
 
