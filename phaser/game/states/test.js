@@ -15,46 +15,44 @@ TestState.prototype = {
   },
   create: function () {
         this.moveEvent = new frp.EventStream();
-        this.frpPlayer = new b.Player();
+      
+        this.frpWorld = new b.World(this.game);
+        this.frpPlayer = this.frpWorld.players[0];
 
+        this.game.physics.startSystem(Phaser.Physics.ARCADE);
         var player = {}
         player.name = "Player";
         this.player = player;
-        var that = this;
-        this.frpPlayer.movement.listen(function (speed) { that.player.sprite.body.velocity.x = speed.vx; });
-        this.frpPlayer.movement.listen(function (speed) { console.log("Speed", speed); });
-        this.frpPlayer.jumping.value.listen(function (v) { that.player.sprite.body.velocity.y -= v; });
-
-        this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        var playerSprite = this.game.add.sprite(100, 200, 'runner');
-        this.game.physics.enable(playerSprite, Phaser.Physics.ARCADE);
-        playerSprite.body.collideWorldBounds = true;
-        playerSprite.body.setSize(14, 14, 2, 10);
-        playerSprite.body.gravity.y = 1050;
-        playerSprite.allowGravity = true;
-       
+        var playerSprite = this.frpPlayer.sprite;
         this.player.sprite = playerSprite;
-      
-        this.wb = new WorldBlocks(this.game);
+
         var that = this;
-        this.frpPlayer.blockSetter.blockSet.listen(function (ignore) { 
-            var gridsize = 19;
-            var x = Math.floor(that.player.sprite.body.x / gridsize);
-            var y = Math.floor(that.player.sprite.body.y / gridsize + 1);
-            if (that.wb.canAddBlock(x, y)) {
-                that.wb.addBlock(x, y);
-            }
-        });
+        var t = b.tick.onTick (this.frpPlayer.movement)
+        t.listen(function (speed) { that.player.sprite.body.velocity.x = speed.vx; });
+        this.frpPlayer.jumping.value.listen(function (v) { that.player.sprite.body.velocity.y -= v; });
+        this.frpPlayer.jumping.value.listen(function (v) { console.log(v, that.player.sprite.body);});
+
+      
+        //this.wb = new WorldBlocks(this.game);
+        // var that = this;
+        // this.frpPlayer.blockSetter.blockSet.listen(function (ignore) { 
+        //     var gridsize = 19;
+        //     var x = Math.floor(that.player.sprite.body.x / gridsize);
+        //     var y = Math.floor(that.player.sprite.body.y / gridsize + 1);
+        //     if (that.wb.canAddBlock(x, y)) {
+        //         that.wb.addBlock(x, y);
+        //     }
+        // });
       
         this.map = this.tiled_loader.create(this.game.add);
-        this.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.wb));
+        //this.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.wb));
 
-        var temp_sprite = this.game.add.sprite(0,0, 'background2');
+        //var temp_sprite = this.game.add.sprite(0,0, 'background2');
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
-        this.game.rootGroup.add(temp_sprite);
-        this.game.rootGroup.add(this.wb.block_group);
+        //this.game.rootGroup.add(temp_sprite);
+        //this.game.rootGroup.add(this.wb.block_group);
         this.game.rootGroup.add(playerSprite);
 
 
@@ -70,23 +68,28 @@ TestState.prototype = {
       return -1;
   },
   update: function () {
-      this.wb.update();
+      //this.wb.update();
       var that = this;
-      this.game.physics.arcade.collide(
-          this.wb.block_group,
-          this.player.sprite,
-          function (sprite, group_sprite) {
-              that.frpPlayer.landedOnBlock.send(true);
-          }
-      );
+      
+      // this.game.physics.arcade.collide(
+      //     this.wb.block_group,
+      //     this.player.sprite,
+      //     function (sprite, group_sprite) {
+      //         that.frpPlayer.landedOnBlock.send(true);
+      //     }
+      // );
+      this.frpPlayer.setPosition(new b.Direction (this.player.sprite.body.x, this.player.sprite.body.y));
       
       var keyboard = this.game.input.keyboard;
+      
+      if (keyboard.isDown(Phaser.Keyboard.P)) {
+          console.log("Player", this.frpPlayer);
+      }
 
       if (!this.jumpDown && this.game.input.keyboard.isDown(Phaser.Keyboard.W)) {
           this.frpPlayer.jumpEvent.send(true);
           this.jumpDown = true;
       } else if (this.jumpDown && !keyboard.isDown(Phaser.Keyboard.W)) {
-          this.frpPlayer.stopJumpEvent.send(true);
           this.jumpDown = false;
       }
 
@@ -100,10 +103,13 @@ TestState.prototype = {
       if (this.moving === false && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
           this.frpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
           this.moving = true;
-      } else if (this.moving === false && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
+      } 
+      if (this.moving === false && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
           this.frpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
           this.moving = true;
-      } else if (this.moving && !(keyboard.isDown(Phaser.Keyboard.A) || keyboard.isDown(Phaser.Keyboard.D))) {
+      } 
+
+      if (!keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
           this.moving = false;
           this.frpPlayer.moveEvent.send(new b.StopMoveEvent());
       }
@@ -123,8 +129,9 @@ TestState.prototype = {
       }
 
       // update stuff
+      b.preTick.send(this.game.time.elapsed);
       frp.system.sync();
-      b.tick.send(16);
+      b.tick.send(this.game.time.elapsed);
       // update tick
       frp.system.sync();
       

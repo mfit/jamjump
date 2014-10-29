@@ -79,6 +79,18 @@ EventStream.prototype.send = function(value) {
     system.addPendingEvent(this, value);
 }
 
+EventStream.prototype.once = function() {
+    var e = new EventStream();
+    var sent = false;
+    unlisten = this.listen(function (v) { 
+        if (!sent) {
+            e.send(v)
+            sent = true;
+        }
+    });
+    return e;
+}
+
 EventStream.prototype.merge = function (eventStream) {
     return merge(this, eventStream);
 }
@@ -152,12 +164,7 @@ System.prototype.sync = function () {
     var oldListeners = this.delayedListeners.slice(0);
     this.delayedListeners = [];
     for (i = 0; i < oldListeners.length; i++) {
-        if (oldListeners[i].source instanceof Delay) {
-            var s = oldListeners[i].source.get();
-            s.listeners.push(oldListeners[i].listener);
-        } else {
-            oldListeners[i].source.listeners.push(oldListeners[i].listener);
-        }
+        oldListeners[i].source.listeners.push(oldListeners[i].listener);
     }
     
     var oldSends = this.delayedSends.slice(0);
@@ -235,11 +242,7 @@ System.prototype.updateBehaviors = function() {
     }
 }
 
-function never() {
-    var e = new EventStream();
-    return e;
-}
-
+// (Event, Event) -> Event
 function merge(event_stream_a, event_stream_b) {
     var e = new EventStream();
     event_stream_a._registerListener(e, function (v) { e.send(v); });
@@ -247,6 +250,7 @@ function merge(event_stream_a, event_stream_b) {
     return e;
 }
 
+// [Event] -> Event
 function mergeAll(eventStreams) {
     var head = eventStreams[0];
     var merged = head;
@@ -271,8 +275,6 @@ function switchE(behavior_with_event) {
 
 function switchBeh(behavior_with_behavior) {
     var b = new Behavior(behavior_with_behavior.current_value.current_value);
-    console.log(b.current_value);
-    
     var listener = new Listener({}, function (val) {b.update(val); });
 
     behavior_with_behavior.current_value.listeners.push(listener);
@@ -287,15 +289,17 @@ function switchBeh(behavior_with_behavior) {
     return b;
 }
 
+// snapshot :: Event -> Behavior -> Event
 function snapshot(event_stream, beh, callback) {
     var e = new EventStream();
     event_stream._registerListener(e, function (val) { e.send(callback(val, beh.current_value)); });
     return e;
 }
 
+// hold :: Value -> Event -> Behavior
+// holds latest value of event
 function hold(initial, event_stream) {
     var b = new Behavior(initial);
-    console.log (initial)
     event_stream._registerListener(b, function (value) {b.update(value)});
     return b;
 }
@@ -331,6 +335,11 @@ function filter(event_stream, test_func) {
     return e;
 }
 
+function gate2(event, behavior, callback) {
+    var b2 = behavior.map (callback);
+    return gate(event, b2);
+}
+
 function gate(event, behavior) {
     var e = new EventStream();
     event._registerListener(e, function (value) {
@@ -342,8 +351,12 @@ function gate(event, behavior) {
 }
 
 function updates(behavior) {
+    if (behavior.hasOwnProperty('_updatesCache')) {
+        return behavior._updatesCache;
+    }
     var e = new EventStream();
     system.registerListener(behavior, new Listener(behavior, function (value) { e.send(value); }));//system.sendDelayed(e, value); }));
+    behavior._updatesCache = e;
     return e;
 }
 
@@ -365,21 +378,8 @@ function accum(initial, event) {
 
 function constMap(event, f) { return map(event, function (v) { return f; }); }
 
-function Delay(f) {
-    this.f = f;
-    return this;
-}
-
-function delayBehavior(delayedBeh) {
-    var init = null;
-    b = new Behavior(init);
-    system.registerListener(delayedBeh, new Listener(b, function(v) { b.update(v); })); 
-    return b;
-}
-
-Delay.prototype.get = function() { return this.f(); }
-
 var system = new System();
+never = new EventStream();
 
 function updateSpeed(speed) {
     return {x:speed.x + 10, y:speed.y};
@@ -454,7 +454,7 @@ function test() {
     
     var addTwo = apply(latest, latest2, function (a, b) { return a + b; });
     
-    var behOfEvents = hold(never(), eventEvent);
+    var behOfEvents = hold(never, eventEvent);
     
     var behOfBeh = new Behavior(hold(0, eventSource));
     var beh_ = switchBeh(behOfBeh);

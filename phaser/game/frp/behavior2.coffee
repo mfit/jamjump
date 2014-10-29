@@ -4,17 +4,38 @@ inc = (x) -> (x + 1)
 dec = (x) -> (x - 1)
 
 tick = new frp.EventStream
-mkCountdown = (initial) -> frp.accum initial, (tick.map ((v) -> ((a) -> a - v))) 
+# a tick for phaser systems that need to be executed at first (e.g. collision)
+preTick = new frp.EventStream
+
+mkCountdown = (initial) ->
+    counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v))) 
+    finished = counter.updates().filter ((v) -> v < 0)
+    return finished.constMap true
 
 class Movement
         
-manyEffects = (initial, effects) ->
+# combine events and their effects
+manyConstEffects = (initial, effects) ->
     funcs = []
     for effect in effects
         [event, func] = effect
         funcs.push (event.constMap func)
     effects = frp.mergeAll funcs
     return (effects.accum initial, effects)
+
+manyEffects = (initial, effects) ->
+    funcs = []
+    for effect in effects
+        [event, func] = effect
+        funcs.push (event.map func)
+    effects = frp.mergeAll funcs
+    return (effects.accum initial, effects)
+
+onEventDo = (e, callback) ->
+   eventEvent = e.map callback
+   behaviorEvent = frp.hold frp.never, eventEvent
+   event = frp.switchE behaviorEvent
+   return event
 
 constant = (x) -> ((a) -> x)
 
@@ -27,13 +48,123 @@ class MoveEvent
     constructor: (x, y) ->
         @dir = new Direction x, y
 
-class Player
+class DefaultBlock
     constructor: ->
+
+class TempBlock
+    constructor: (touchEvent) ->
+        countdownFinishedEvent = onEventDo touchEvent, ((v) -> mkCountdown 1000)
+        @removeMeEvent = countdownFinishedEvent.once().constMap true
+
+class StoneBlock
+    constructor: ->
+
+class DeathBlock
+    constructor: (touchEvent) ->
+
+class BlockManager
+    constructor: (game) ->
+        @blocks = {}
+        @block_group = game.add.group()
+        @block_group.enableBody = true;
+        @block_group.allowGravity = false;
+        @block_group.immovable = true;
+
+        @blockSize = 19
+
+    toWorldCoords: (x, y) ->
+        return {x:x*@blockSize, y:y*@blockSize}
+
+    fromWorldCoords: (x, y) ->
+        x = Math.floor(x / @blockSize)
+        y = Math.floor(y / @blockSize + 1)
+        return {x:x, y:y}
+
+    canAddBlock: (x, y) ->
+        return false if @blocks.hasOwnProperty(y) && @blocks[y].hasOwnProperty x
+        return true
+
+    addBlock: (x, y, block) ->
+        if not @canAddBlock x, y
+            return
+
+        if !@blocks.hasOwnProperty y
+            @blocks[y] = {}
+        @blocks[y][x] = block
+        block.x = x
+        block.y = y
+
+        coords = @toWorldCoords x, y
+        block.sprite = @block_group.create coords.x, coords.y
+        block.sprite.loadTexture 'redboxblock', 1
+        block.sprite.body.immovable = true
+        block.sprite.body.setSize 20, 20, 2, 2
+
+    removeBlock: (x, y) ->
+        if @blocks.hasOwnProperty(y) and @blocks[y].hasOwnProperty x
+            @blocks[y][x].sprite.kill()
+            delete @blocks[y][x]
+        
+    copy: (mgr) ->
+
+    @mkBehaviors: (game) ->
+        # command events
+        addBlock = new frp.EventStream
+        removeBlock = new frp.EventStream
+
+        # command executed events
+        addedBlock = new frp.EventStream
+        removedBlock = new frp.EventStream
+
+        effects = [
+           addBlock.map ((blockInfo) -> (bm) ->
+                block = blockInfo.block
+                bm.addBlock blockInfo.x, blockInfo.y, block
+                if block.removeMeEvent 
+                    block.removeMeEvent.listen ((v) -> removeBlock.send block)
+                return bm
+                )
+           removeBlock.map ((block) -> (bm) ->
+                bm.removeBlock (block.x), (block.y)
+                return bm
+                )
+        ]
+
+        bm = frp.accum (new BlockManager(game)), frp.mergeAll effects
+        bm.addBlock = addBlock
+        bm.removeBlock = removeBlock
+
+        bm.addedBlock = addBlock
+        return bm
+
+class World
+    constructor: (game) ->
+        @players = [new Player game] #, new Player game]
+        @worldBlocks = BlockManager.mkBehaviors game
+
+        for y in [20..20]
+            for x in [0..20]
+                @worldBlocks.addBlock.send
+                    x:x
+                    y:y
+                    block:new TempBlock frp.never
+
+        console.log "tick", tick
+        preTick.onTickDo @worldBlocks, ((blockManager) =>
+            game.physics.arcade.collide blockManager.block_group, @players[0].sprite, (sprite, group_sprite) =>
+                @players[0].landedOnBlock.send true
+                console.log "Collision"
+            )
+
+class Player
+    constructor: (game) ->
         @moveEvent = new frp.EventStream
         @jumpEvent = new frp.EventStream
         @stopJumpEvent = new frp.EventStream
-        @landedOnBlock = new frp.EventStream
         @setBlockEvent = new frp.EventStream
+
+        # from phaser
+        @landedOnBlock = new frp.EventStream
 
         startMovement = new Movement tick, this
 
@@ -45,16 +176,38 @@ class Player
                     movement = new Movement2 tick, _this
                     return movement.value
         }, tick, this
-        @movement2 = new Movement2 tick, this
         @jumping = new Jumping tick, this
         @blockSetter = new BlockSetter tick, this
+
+        # position only to test discrepancies between phaser coordinates and behavior coordinates
+        setPosition = new frp.EventStream
+        effects = [
+            [setPosition, (pos) -> (oldPos) -> pos]
+            [(tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)), (dPos) -> (pos) ->
+                    new Direction (pos.x + dPos), (pos.y)]
+        ]
+
+        @position = manyEffects (new Direction 0, 0), effects
+        @setPosition = (x, y) -> setPosition.send x, y
+
+        @sprite = game.add.sprite 100, 200, 'runner'
+        game.physics.enable @sprite, Phaser.Physics.ARCADE
+        @sprite.body.collideWorldBounds = true
+        @sprite.body.setSize 14, 14, 2, 10
+        @sprite.body.gravity.y = 1050
+        @sprite.allowGravity = true
+
+        @jumping.value.listen ((vy) => @sprite.body.velocity.y -= vy)
+
+        t = tick.onTickDo (@movement), ((speed) => @sprite.body.velocity.x = speed.vx)
 
 # TODO splats for arbitary number of arguments
 selector = (initial, choices, arg1, arg2) ->
     setter = new frp.EventStream 
-    choice = setter.map ((e) -> choices[e](arg1, arg2))
+    choice = setter.map ((e) -> choices[e](arg1, arg2)) # Event (Behavior)
 
-    selected = frp.switchE (frp.hold initial, choice)
+    # frp.hold initial, choice # Behavior (Behavior)
+    selected = frp.switchBeh (frp.hold initial, choice) # Behavior
     return [setter, selected]
 
 class Speed
@@ -85,7 +238,10 @@ class Direction
 second = (a, b) -> b
 
 # event that represents the value of the behavior on tick
-tick.onTick = (beh) => @tick.snapshot beh, second
+tick.onTick = (beh) => tick.snapshot beh, second
+preTick.onTick = (beh) => preTick.snapshot beh, second
+tick.onTickDo = (beh, callback) => tick.snapshot beh, ((t, behValue) -> callback behValue)
+preTick.onTickDo = (beh, callback) => preTick.snapshot beh, ((t, behValue) -> callback behValue)
 
 class Movement2
     constructor: (@tick, @player) ->
@@ -104,9 +260,9 @@ class Movement2
                     frp.accum @BASESPEED, @tick.map ((t) => ((speed) => upperCap (t/4.0 + speed), @MAXSPEED))]
         ]
 
-        speed = frp.switchBeh (manyEffects (new frp.Behavior 0), effects)
+        speed = frp.switchBeh (manyConstEffects (new frp.Behavior 0), effects)
         @speed = speed.map ((speed) -> new Speed speed, 0)
-        @value = @tick.onTick (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed)) 
+        @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed)) 
         
 class Movement
     constructor: (@tick, @player) ->
@@ -120,7 +276,7 @@ class Movement
         @movingDirection = frp.hold Direction.null(), (@player.moveEvent.map ((e) ->
             e.dir))
             
-        @value = @tick.onTick (@movingDirection.map ((dir) => dir.times @BASESPEED))
+        @value = (@movingDirection.map ((dir) => dir.times @BASESPEED))
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
 upperCap = (v, cap) -> if v > cap then return cap else v
@@ -155,18 +311,35 @@ class Jumping
             @player.jumpEvent
         ]
 
-        @JUMPFORCE = 300
+        @JUMPFORCE = 200
+        @MAX_JUMPS = 3
 
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
                 (@player.jumpEvent.constMap inc)
                 (@player.landedOnBlock.constMap (constant 0))
         ])
         
-        @canJump = @jumpsSinceLand.map ((jumps) -> jumps <= 2)
+        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
 
-module.exports.Player = Player
+b = new frp.Behavior 0
+
+event = new frp.EventStream
+        
+behavior = frp.accum 0, event
+behavior2 = behavior.map ((v) -> v - 1)
+event.send ((v) -> v + 1)
+event.send ((v) -> v + 2)
+console.log (behavior.current_value)
+console.log (behavior2.current_value)
+
+behavior2.updates().listen (log "Behavior2 updated with")
+frp.system.sync()
+
+module.exports.World = World
 module.exports.MoveEvent = MoveEvent
 module.exports.StopMoveEvent = StopMoveEvent
+module.exports.Direction = Direction
 module.exports.tick = tick
+module.exports.preTick = preTick
