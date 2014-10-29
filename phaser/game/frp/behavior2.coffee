@@ -305,16 +305,26 @@ class BlockSetter
         @blockSet = new frp.EventStream
 
         @MAXPOWER = 1000
-        @BLOCKCOST = 300
+        @BLOCKCOST = 50
         @MINPOWER = 0
 
+        
+        setFull = new frp.EventStream
+        full = frp.hold false, setFull
+
+        refill = @tick.gate (full.not())
+        refill = refill.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
+        
         effects = [
-                @tick.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
+                refill
                 @blockSet.constMap ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
         ]
 
         @blockpower = frp.accum 0, (frp.mergeAll effects)
         @canSetBlock = @blockpower.map ((v) => v > @BLOCKCOST)
+        isFull = @blockpower.map ((v) => v >= @MAXPOWER)
+        isFull.updates().onTrue(->setFull.send true)
+        @blockSet.onTrue(->setFull.send false)
 
         doSetBlock = @player.setBlockEvent.gate @canSetBlock
         doSetBlock.listen ((v) => @blockSet.send true)
@@ -331,6 +341,7 @@ class Jumping
 
         @JUMPFORCE = 300
         @MAX_JUMPS = 3
+
 
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
                 (@player.jumpEvent.constMap inc)

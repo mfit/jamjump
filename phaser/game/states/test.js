@@ -86,11 +86,8 @@ TestState.prototype = {
           this.jumpDown = false;
       }
 
-      if (this.blockSetDown === false && this.game.input.keyboard.isDown(Phaser.Keyboard.S)) {
+      if (this.game.input.keyboard.isDown(Phaser.Keyboard.S)) {
           this.frpPlayer.setBlockEvent.send(true);
-          this.blockSetDown = true;
-      } else if (this.blockSetDown === true && !keyboard.isDown(Phaser.Keyboard.S)) {
-          this.blockSetDown = false;
       }
       
       if (this.moving === false && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {

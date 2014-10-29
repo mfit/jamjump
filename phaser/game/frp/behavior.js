@@ -6,6 +6,11 @@ function Behavior(value) {
     this.id = system.mkId();
 }
 
+Behavior.prototype.not = function() {
+    b = this.map(function (val) { return !val; });
+    return b
+}
+
 Behavior.prototype.switchE = function () {
     return switchE(this);
 }
@@ -77,6 +82,14 @@ EventStream.prototype._unregisterListener = function(listener) {
 
 EventStream.prototype.send = function(value) {
     system.addPendingEvent(this, value);
+}
+
+EventStream.prototype.onTrue = function (callback) {
+    this.map(function (value) {
+        if (value === true) {
+            callback();
+        }
+    });
 }
 
 EventStream.prototype.once = function() {
