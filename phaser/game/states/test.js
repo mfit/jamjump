@@ -29,21 +29,6 @@ TestState.prototype = {
         this.player.sprite = playerSprite;
         this.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
 
-        //this.wb = new WorldBlocks(this.game);
-        // var that = this;
-        // this.frpPlayer.blockSetter.blockSet.listen(function (ignore) { 
-        //     var gridsize = 19;
-        //     var x = Math.floor(that.player.sprite.body.x / gridsize);
-        //     var y = Math.floor(that.player.sprite.body.y / gridsize + 1);
-        //     if (that.wb.canAddBlock(x, y)) {
-        //         that.wb.addBlock(x, y);
-        //     }
-        // });
-      
-
-
-        //var temp_sprite = this.game.add.sprite(0,0, 'background2');
-
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
         //this.game.rootGroup.add(temp_sprite);
@@ -65,14 +50,7 @@ TestState.prototype = {
   update: function () {
       //this.wb.update();
       var that = this;
-      
-      // this.game.physics.arcade.collide(
-      //     this.wb.block_group,
-      //     this.player.sprite,
-      //     function (sprite, group_sprite) {
-      //         that.frpPlayer.landedOnBlock.send(true);
-      //     }
-      // );
+
       this.frpPlayer.setPosition(new b.Direction (this.player.sprite.body.x, this.player.sprite.body.y));
       
       var keyboard = this.game.input.keyboard;
