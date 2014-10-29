@@ -64,9 +64,15 @@ class TempBlock
 
 class StoneBlock
     constructor: ->
+        @texture = 'stoneblock'
 
 class DeathBlock
-    constructor: (touchEvent) ->
+    constructor: ->
+        @texture = 'deathblock'
+
+class WinBlock
+    constructor: ->
+        @texture = 'winblock'
 
 class BlockManager
     constructor: (game) ->
@@ -148,18 +154,6 @@ class World
     constructor: (game) ->
         @players = [new Player game] #, new Player game]
         @worldBlocks = BlockManager.mkBehaviors game
-
-        for y in [20..20]
-            for x in [0..20]
-                block = new TempBlock
-                @worldBlocks.addBlock.send
-                    x:x
-                    y:y
-                    block:block
-        for y in [21..21]
-            for x in [0..20]
-                block = new DefaultBlock
-                @worldBlocks.addBlock.send {x:x, y:y, block:block}
 
         for player in @players
            player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
@@ -370,3 +364,8 @@ module.exports.StopMoveEvent = StopMoveEvent
 module.exports.Direction = Direction
 module.exports.tick = tick
 module.exports.preTick = preTick
+
+module.exports.DefaultBlock = DefaultBlock
+module.exports.WinBlock = WinBlock
+module.exports.StoneBlock = StoneBlock
+module.exports.DeathBlock = DeathBlock

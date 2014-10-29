@@ -38,7 +38,7 @@ TestState.prototype = {
         // });
       
         this.map = this.tiled_loader.create(this.game.add);
-        //this.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.wb));
+        this.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
 
         //var temp_sprite = this.game.add.sprite(0,0, 'background2');
 

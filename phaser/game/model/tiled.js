@@ -1,4 +1,6 @@
 // TiledLoader("tiled_level.json", {'spritesheet': 'assets/spritesheet.png'}, ['Tile Layer 1']);
+var b = require('../frp/behavior2.js')
+
 function TiledLoader(tiled_json_file, tileset_images, layers) {
     this.filename = tiled_json_file;
     this.tileset_images = tileset_images;
@@ -60,8 +62,8 @@ function LayerInterpreter() {
 LayerInterpreter.prototype.makeTile = function (x, y, tile) {
 }
     
-function BaseInterpreter(worldBlocks) {
-    this.wb = worldBlocks;
+function BaseInterpreter(frpWorld) {
+    this.frpWorld = frpWorld;
 }
 
 BaseInterpreter.prototype = new TiledInterpreter();
@@ -72,17 +74,23 @@ BaseInterpreter.prototype.getLayerInterpreter = function (layer) {
 }
 
 function BlockLayerInterpreter(baseInterpreter) {
-    this.wb = baseInterpreter.wb;
+    this.frpWorld = baseInterpreter.frpWorld;
 }
 BlockLayerInterpreter.prototype = new LayerInterpreter();
 BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
     if (tile.properties.hasOwnProperty('type')) {
         switch (tile.properties['type']) {
             case 'DefaultBlock':
-                this.wb.addBlock(x, y);
+                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.DefaultBlock()});
                 break;
-            default:
-                this.wb.addBlock(x, y, tile.properties['type']);
+            case 'stone':
+                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.StoneBlock()});
+                break;
+            case 'win':
+                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.WinBlock()});
+                break;
+            case 'death':
+                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.DeathBlock()});
                 break;
         }
     }
