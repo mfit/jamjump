@@ -17,7 +17,7 @@ module.exports = function (grunt) {
   // load all grunt tasks
   require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
   var path = require('path');
- 
+
   // https://gist.github.com/cowboy/3819170
   grunt.registerMultiTask('subgrunt', 'Run a sub-project\'s grunt tasks.', function() {
     if (!grunt.file.exists(this.data.subdir)) {
@@ -44,10 +44,18 @@ module.exports = function (grunt) {
 
   grunt.initConfig({
     coffee: {
-        compile: {
-            files: {
-                'game/frp/behavior2.js': 'game/frp/behavior2.coffee',
-            }
+        // compile: {
+        //     files: {
+        //         'game/frp/behavior2.js': 'game/frp/behavior2.coffee',
+        //     }
+        // }
+        compile_all: {
+          expand: true,
+          flatten: false,
+          cwd: 'game',
+          src: ['**/*.coffee'],
+          dest: 'game/',
+          ext: '.js'
         }
     },
     subgrunt: {
@@ -115,7 +123,7 @@ module.exports = function (grunt) {
       }
     }
   });
-    
+
 
   grunt.registerTask('build', ['coffee', 'buildBootstrapper', 'browserify','copy']);
   grunt.registerTask('phaser', ['subgrunt']);
