@@ -2,6 +2,7 @@
 'use strict';
 var GameSetup = require('../model/setup');
 var GUI = require('../model/gui');
+var Tiled = require('../model/tiled');
 function Preload() {
   this.asset = null;
   this.ready = false;
@@ -70,6 +71,9 @@ Preload.prototype = {
     //
     this.load.image('tileset', 'assets/blocks_tiles.png'); // loading the tileset image
     this.load.tilemap('map', 'assets/test.json', null, Phaser.Tilemap.TILED_JSON); // loading the tilemap
+    this.game.tiled_loader = new Tiled.TiledLoader('assets/levels/tiled_level.json', {'spritesheet':'assets/spritesheet.png'}, 
+                                         ['BlockLayer']);
+    this.game.tiled_loader.load(this.game.load);
 
   },
   create: function() {

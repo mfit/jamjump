@@ -21,7 +21,7 @@ TiledLoader.prototype.load = function(loader) {
 
 TiledLoader.prototype.create = function(adder) {
     var tiled_map = adder.tilemap('level');
-
+    
     for (var tileset in this.loaded_images) {
         tiled_map.addTilesetImage(tileset, tileset);
         console.log(tileset);
@@ -79,23 +79,27 @@ function BlockLayerInterpreter(baseInterpreter) {
 BlockLayerInterpreter.prototype = new LayerInterpreter();
 BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
     if (tile.properties.hasOwnProperty('type')) {
+        console.log(tile);
+        var block = null;
         switch (tile.properties['type']) {
             case 'DefaultBlock':
-                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.DefaultBlock()});
+                block = new b.DefaultBlock();
                 break;
             case 'vanishing':
-                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.TempBlock()});
+                block = new b.TempBlock();
                 break;
             case 'stone':
-                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.StoneBlock()});
+                block = new b.StoneBlock();
                 break;
             case 'win':
-                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.WinBlock()});
+                block = new b.WinBlock();
                 break;
             case 'death':
-                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.DeathBlock()});
+                block = new b.DeathBlock();
                 break;
         }
+        block.gid = tile.index;
+        this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:block});
     }
 }
 
@@ -114,7 +118,6 @@ LoadTiledAtlas = function (game, tilemap) {
             }
             frames.push(frame);
         }
-        console.log(frames);
         game.load.atlas("test", "assets/spritesheet.png", null, {frames:frames}, Phaser.Loader.TEXTURE_ATLAS_JSON_ARRAY);
     }
 }

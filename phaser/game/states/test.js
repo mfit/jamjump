@@ -9,11 +9,13 @@ function TestState() {}
 
 TestState.prototype = {
   preload: function () {
-    this.tiled_loader = new Tiled.TiledLoader('assets/levels/tiled_level.json', {'spritesheet':'assets/spritesheet.png'}, 
-                                         ['Tile Layer 1']);
-    this.tiled_loader.load(this.game.load);
+        this.game.map = this.game.tiled_loader.create(this.game.add);
+        this.map = this.game.map;
+        Tiled.LoadTiledAtlas(this.game, this.map);
   },
   create: function () {
+        //var e = Tiled.MakeObjectLayerSprites(this.game, this.map, 'Object Layer 1');
+        //console.log(e);
         this.moveEvent = new frp.EventStream();
       
         this.frpWorld = new b.World(this.game);
@@ -25,6 +27,7 @@ TestState.prototype = {
         this.player = player;
         var playerSprite = this.frpPlayer.sprite;
         this.player.sprite = playerSprite;
+        this.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
 
         //this.wb = new WorldBlocks(this.game);
         // var that = this;
@@ -37,8 +40,7 @@ TestState.prototype = {
         //     }
         // });
       
-        this.map = this.tiled_loader.create(this.game.add);
-        this.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
+
 
         //var temp_sprite = this.game.add.sprite(0,0, 'background2');
 

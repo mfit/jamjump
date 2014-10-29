@@ -65,17 +65,23 @@ class TempBlock
 class StoneBlock
     constructor: ->
         @texture = 'stoneblock'
+        @touchEvent = new frp.EventStream
 
 class DeathBlock
     constructor: ->
         @texture = 'deathblock'
+        @touchEvent = new frp.EventStream
 
 class WinBlock
     constructor: ->
         @texture = 'winblock'
+        @touchEvent = new frp.EventStream
+
+# hack
+Phaser.TileSprite.prototype.kill = Phaser.Sprite.prototype.kill
 
 class BlockManager
-    constructor: (game) ->
+    constructor: (@game) ->
         @blocks = {}
         @block_group = game.add.group()
         @block_group.enableBody = true;
@@ -107,15 +113,21 @@ class BlockManager
         block.y = y
 
         coords = @toWorldCoords x, y
-        block.sprite = @block_group.create coords.x, coords.y
-        block.sprite.loadTexture block.texture, 1
+
+
+        setIndex = @game.map.tiles[block.gid][2];
+        set = @game.map.tilesets[setIndex];
+        block.sprite = @game.add.tileSprite (coords.x), (coords.y), set.tileWidth, set.tileHeight, "test", block.gid
+        block.sprite = @block_group.add block.sprite
+        #block.sprite.loadTexture block.texture, 1
         block.sprite.body.immovable = true
         block.sprite.body.setSize 20, 20, 2, 2
         block.sprite.block = block
 
     removeBlock: (x, y) ->
         if @blocks.hasOwnProperty(y) and @blocks[y].hasOwnProperty x
-            @blocks[y][x].sprite.kill()
+            block = @blocks[y][x]
+            block.sprite.kill()
             delete @blocks[y][x]
         
     copy: (mgr) ->
