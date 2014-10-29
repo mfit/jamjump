@@ -54,6 +54,7 @@ class DefaultBlock
     constructor: ->
         @texture = 'redboxblock'
         @touchEvent = new frp.EventStream
+        @gid = 124
 
 class TempBlock
     constructor: () ->
@@ -66,6 +67,7 @@ class StoneBlock
     constructor: ->
         @texture = 'stoneblock'
         @touchEvent = new frp.EventStream
+        @gid = 304
 
 class DeathBlock
     constructor: ->
@@ -112,8 +114,8 @@ class BlockManager
         block.x = x
         block.y = y
 
+        console.log (block.gid)
         coords = @toWorldCoords x, y
-
 
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
