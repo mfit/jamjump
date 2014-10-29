@@ -52,12 +52,15 @@ class MoveEvent
 
 class DefaultBlock
     constructor: ->
+        @texture = 'redboxblock'
+        @touchEvent = new frp.EventStream
 
 class TempBlock
     constructor: () ->
         @touchEvent = (new frp.EventStream()).once() # multiple sends would reset the countdown
         countdownFinishedEvent = onEventDo @touchEvent, frp.never, ((v) -> mkCountdown 500)
         @removeMeEvent = countdownFinishedEvent.once().constMap true
+        @texture = 'redboxblock'
 
 class StoneBlock
     constructor: ->
@@ -99,7 +102,7 @@ class BlockManager
 
         coords = @toWorldCoords x, y
         block.sprite = @block_group.create coords.x, coords.y
-        block.sprite.loadTexture 'redboxblock', 1
+        block.sprite.loadTexture block.texture, 1
         block.sprite.body.immovable = true
         block.sprite.body.setSize 20, 20, 2, 2
         block.sprite.block = block
@@ -153,6 +156,19 @@ class World
                     x:x
                     y:y
                     block:block
+        for y in [21..21]
+            for x in [0..20]
+                block = new DefaultBlock
+                @worldBlocks.addBlock.send {x:x, y:y, block:block}
+
+        for player in @players
+           player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
+                gridsize = 19;
+                console.log pos
+                x = Math.floor(pos.x / gridsize)
+                y = Math.floor(pos.y / gridsize + 1)
+                @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
+                )
 
         preTick.onTickDo @worldBlocks, ((blockManager) =>
             game.physics.arcade.collide blockManager.block_group, @players[0].sprite, (sprite, group_sprite) =>

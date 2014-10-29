@@ -103,6 +103,21 @@ EventStream.prototype.snapshot = function (beh, callback) {
     return snapshot(this, beh, callback);
 }
 
+// untested
+EventStream.prototype.snapshotMany = function (behs, callback) {
+    last = behs[0].map(function (val) { return [val]; });
+    for (var i = 1; i < behs.length; i++) {
+        last = last.apply(behs[i], function (args, arg2) { return args.push(arg2); });
+    }
+    return this.snapshot(last, function (evt, args) {
+        var argsFinal = [evt]
+        for (var j = 0; j < args.length; j++) {
+            argsFinal.push(args[j]);
+        }
+        callback.apply(this, argsFinal);
+    });
+}
+
 EventStream.prototype.hold = function (initial) {
     return hold(initial, this);
 }
