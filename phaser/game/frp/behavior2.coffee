@@ -31,12 +31,14 @@ manyEffects = (initial, effects) ->
     effects = frp.mergeAll funcs
     return (effects.accum initial, effects)
 
-onEventDo = (e, callback) ->
-   eventEvent = e.map callback
-   behaviorEvent = frp.hold frp.never, eventEvent
-   event = frp.switchE behaviorEvent
+# the callback has to return an event
+onEventDo = (e, initial, callback) ->
+   eventEvent = e.map callback # event (event a)
+   behaviorEvent = frp.hold initial, eventEvent # behavior (event a)
+   event = frp.switchE behaviorEvent # event (a)
    return event
 
+# return a function returning a constant
 constant = (x) -> ((a) -> x)
 
 log = (t) -> ((v) -> console.log t, v)
@@ -52,8 +54,9 @@ class DefaultBlock
     constructor: ->
 
 class TempBlock
-    constructor: (touchEvent) ->
-        countdownFinishedEvent = onEventDo touchEvent, ((v) -> mkCountdown 1000)
+    constructor: () ->
+        @touchEvent = (new frp.EventStream()).once() # multiple sends would reset the countdown
+        countdownFinishedEvent = onEventDo @touchEvent, frp.never, ((v) -> mkCountdown 500)
         @removeMeEvent = countdownFinishedEvent.once().constMap true
 
 class StoneBlock
@@ -99,6 +102,7 @@ class BlockManager
         block.sprite.loadTexture 'redboxblock', 1
         block.sprite.body.immovable = true
         block.sprite.body.setSize 20, 20, 2, 2
+        block.sprite.block = block
 
     removeBlock: (x, y) ->
         if @blocks.hasOwnProperty(y) and @blocks[y].hasOwnProperty x
@@ -144,13 +148,15 @@ class World
 
         for y in [20..20]
             for x in [0..20]
+                block = new TempBlock
                 @worldBlocks.addBlock.send
                     x:x
                     y:y
-                    block:new TempBlock frp.never
+                    block:block
 
         preTick.onTickDo @worldBlocks, ((blockManager) =>
             game.physics.arcade.collide blockManager.block_group, @players[0].sprite, (sprite, group_sprite) =>
+                group_sprite.block.touchEvent.send true
                 @players[0].landedOnBlock.send true
             )
 

@@ -82,11 +82,15 @@ EventStream.prototype.send = function(value) {
 EventStream.prototype.once = function() {
     var e = new EventStream();
     var sent = false;
-    unlisten = this.listen(function (v) { 
+    e._send = e.send;
+    e.send = function (value) {
         if (!sent) {
-            e.send(v)
+            e._send(value);
             sent = true;
         }
+    }
+    unlisten = this.listen(function (v) { 
+        e.send(v);
     });
     return e;
 }
