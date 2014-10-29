@@ -149,18 +149,15 @@ class World
                     y:y
                     block:new TempBlock frp.never
 
-        console.log "tick", tick
         preTick.onTickDo @worldBlocks, ((blockManager) =>
             game.physics.arcade.collide blockManager.block_group, @players[0].sprite, (sprite, group_sprite) =>
                 @players[0].landedOnBlock.send true
-                console.log "Collision"
             )
 
 class Player
     constructor: (game) ->
         @moveEvent = new frp.EventStream
         @jumpEvent = new frp.EventStream
-        @stopJumpEvent = new frp.EventStream
         @setBlockEvent = new frp.EventStream
 
         # from phaser
@@ -304,14 +301,13 @@ class Jumping
     constructor: (@tick, @player) ->
         jumpResets = frp.mergeAll [
             @player.landedOnBlock
-            @player.stopJumpEvent
         ]
 
         jumpStarters = frp.mergeAll [
             @player.jumpEvent
         ]
 
-        @JUMPFORCE = 200
+        @JUMPFORCE = 300
         @MAX_JUMPS = 3
 
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
@@ -319,7 +315,7 @@ class Jumping
                 (@player.landedOnBlock.constMap (constant 0))
         ])
         
-        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
+        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS - 1)
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
 
@@ -331,8 +327,6 @@ behavior = frp.accum 0, event
 behavior2 = behavior.map ((v) -> v - 1)
 event.send ((v) -> v + 1)
 event.send ((v) -> v + 2)
-console.log (behavior.current_value)
-console.log (behavior2.current_value)
 
 behavior2.updates().listen (log "Behavior2 updated with")
 frp.system.sync()

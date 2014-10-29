@@ -26,13 +26,6 @@ TestState.prototype = {
         var playerSprite = this.frpPlayer.sprite;
         this.player.sprite = playerSprite;
 
-        var that = this;
-        var t = b.tick.onTick (this.frpPlayer.movement)
-        t.listen(function (speed) { that.player.sprite.body.velocity.x = speed.vx; });
-        this.frpPlayer.jumping.value.listen(function (v) { that.player.sprite.body.velocity.y -= v; });
-        this.frpPlayer.jumping.value.listen(function (v) { console.log(v, that.player.sprite.body);});
-
-      
         //this.wb = new WorldBlocks(this.game);
         // var that = this;
         // this.frpPlayer.blockSetter.blockSet.listen(function (ignore) { 
