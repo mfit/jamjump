@@ -83,6 +83,9 @@ BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
             case 'DefaultBlock':
                 this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.DefaultBlock()});
                 break;
+            case 'vanishing':
+                this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.TempBlock()});
+                break;
             case 'stone':
                 this.frpWorld.worldBlocks.addBlock.send({x:x, y:y, block:new b.StoneBlock()});
                 break;

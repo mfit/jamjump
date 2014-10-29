@@ -369,3 +369,4 @@ module.exports.DefaultBlock = DefaultBlock
 module.exports.WinBlock = WinBlock
 module.exports.StoneBlock = StoneBlock
 module.exports.DeathBlock = DeathBlock
+module.exports.TempBlock = TempBlock

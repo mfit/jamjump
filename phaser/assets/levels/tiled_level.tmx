@@ -7,6 +7,11 @@
     <property name="type" value="DefaultBlock"/>
    </properties>
   </tile>
+  <tile id="63">
+   <properties>
+    <property name="type" value="vanishing"/>
+   </properties>
+  </tile>
   <tile id="123">
    <properties>
     <property name="type" value="win"/>
@@ -393,7 +398,7 @@
    <tile gid="4"/>
    <tile gid="4"/>
    <tile gid="4"/>
-   <tile gid="4"/>
+   <tile gid="64"/>
    <tile gid="4"/>
    <tile gid="4"/>
    <tile gid="4"/>
