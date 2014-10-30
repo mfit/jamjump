@@ -261,7 +261,7 @@ class Player
         @sprite = game.add.sprite 100, 200, 'runner'
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true
-        @sprite.body.setSize 12, 23, 7, 1
+        @sprite.body.setSize 7, 28, 3, 0
         @sprite.body.gravity.y = 1050
         @sprite.allowGravity = true
 
