@@ -7,6 +7,7 @@ tick = new frp.EventStream
 # a tick for phaser systems that need to be executed at first (e.g. collision)
 preTick = new frp.EventStream
 
+# returns an event that triggers once after 'initial' milliseconds
 mkCountdown = (initial) ->
     counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v))) 
     finished = counter.updates().filter ((v) -> v < 0)
@@ -31,7 +32,7 @@ manyEffects = (initial, effects) ->
     effects = frp.mergeAll funcs
     return (effects.accum initial, effects)
 
-# the callback has to return an event
+# returns the event returned by the callback when e triggers or the initial event
 onEventDo = (e, initial, callback) ->
    eventEvent = e.map callback # event (event a)
    behaviorEvent = frp.hold initial, eventEvent # behavior (event a)
@@ -119,8 +120,6 @@ class BlockManager
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
 
-        console.log "set", set
-        console.log "coords", coords
         block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
                 (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
         block.sprite = @block_group.add block.sprite
@@ -215,6 +214,24 @@ class World
         @camera = new Camera tick, game, this
         @particles = new ParticleGroup game
 
+        @trees = game.add.group();
+        trees = game.add.sprite 0, 500, 'trees'
+        @trees_high = game.add.sprite 0, 500, 'trees_high'
+        @trees_high.blendMode = PIXI.blendModes.ADD
+
+        @trees_high.shader = new IntensityFilter 0
+
+        tick.listen ((t) =>
+            width = @trees_high.texture.width
+            height = @trees_high.texture.height
+            @trees_high.shader.uniforms.relPos.value.x = game.input.x - width/2.0 + game.camera.x;
+            @trees_high.shader.uniforms.relPos.value.y = + 500 - game.input.y + height + game.camera.y
+            @trees_high.shader.dirty = true
+            )
+
+        @trees.add trees
+        @trees.add @trees_high
+
         for player in @players
            player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
                 gridsize = 25;
@@ -243,7 +260,33 @@ class TestFilter extends PIXI.AbstractFilter
             '   gl_FragColor = vec4(color, 1);'
             '}'
         ] 
-       
+
+class IntensityFilter extends PIXI.AbstractFilter
+    constructor: (intensity) ->
+        PIXI.AbstractFilter.call this
+        this.uniforms =
+            intensity:
+                type: '1f'
+                value: intensity
+            relPos:
+                type: '2f'
+                value: {x:0, y:0}
+        @fragmentSrc = [
+                'precision mediump float;'
+                'varying vec2 vTextureCoord;'
+                'varying vec4 vColor;'
+                'uniform sampler2D uSampler;'
+                'uniform vec2 relPos;'
+                'uniform float intensity;'
+                'void main(void) {'
+                '    float angle = atan(relPos.y, relPos.x);'
+                '    vec4 color = texture2D(uSampler, vTextureCoord);' 
+                '    float sprAngle = (color.r)*3.14;'
+                '    float newIntensity = abs(angle - sprAngle)/3.14;'
+                '    gl_FragColor = vec4(1, 1, 0.8, color.a*newIntensity);'
+                '}'
+            ]
+                
 class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();

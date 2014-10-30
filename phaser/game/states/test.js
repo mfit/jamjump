@@ -44,6 +44,7 @@ TestState.prototype = {
         this.game.rootGroup.add(this.frpWorld.worldBlocks.current_value.block_group);
         this.game.rootGroup.add(playerSprite);
         this.game.rootGroup.add(this.frpWorld.particles.group);
+        this.game.rootGroup.add(this.frpWorld.trees);
 
 
         // Set 1 color bg
