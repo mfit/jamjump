@@ -2,7 +2,7 @@ function Behavior(value) {
     this.current_value = value;
     this.pending_value = null;
     
-    this.listeners = [];
+    this.listeners = {};
     this.id = system.mkId();
 }
 
@@ -50,24 +50,18 @@ Behavior.prototype.update = function(value) {
 }
 
 Behavior.prototype._unregisterListener = function(listener) {
-    for (var i = 0; i < this.listeners.length; i++) {
-        if (this.listeners[i] === listener) {
-            this.listeners.splice(i, 1);
-            return;
-        }
-    }
-    
-    console.error("listener does not exist");
+    delete this.listeners[listener.id]
 }
 
 function EventStream() {
     this.value = null;
     
-    this.listeners = [];
+    this.listeners = {};
     this.id = system.mkId();
 }
 
 function Listener(listener, callback) {
+    this.id = system.mkId();
     this.listener = listener;
     this.callback = callback;
 }
@@ -78,14 +72,7 @@ function EventInstance(event_stream, event_value) {
 }
 
 EventStream.prototype._unregisterListener = function(listener) {
-    for (var i = 0; i < this.listeners.length; i++) {
-        if (this.listeners[i] === listener) {
-            this.listeners.splice(i, 1);
-            return;
-        }
-    }
-    
-    console.error("listener does not exist");
+    delete this.listeners[listener.id]
 }
 
 EventStream.prototype.send = function(value) {
@@ -108,9 +95,10 @@ EventStream.prototype.once = function() {
         if (!sent) {
             e._send(value);
             sent = true;
+            e.unlisten();
         }
     }
-    unlisten = this.listen(function (v) { 
+    e.unlisten = this.listen(function (v) { 
         e.send(v);
     });
     return e;
@@ -168,7 +156,13 @@ EventStream.prototype.accum = function (initial) {
 }
 
 EventStream.prototype._registerListener = function (listener, callback) {
-    this.listeners.push(new Listener(listener, callback));
+    var listener = new Listener(listener, callback);
+    console.log ("list", listener)
+    this.listeners[listener.id] = listener;
+    var that = this;
+    return function() {
+        delete that.listeners[listener.id]
+    }
 }
 
 function System() {
@@ -176,8 +170,6 @@ function System() {
     this.pendingEvents = [];
     this.pendingUpdates = {};
     this.futureValues = {};
-    this.delayedListeners = [];
-    this.delayedSends = [];
 }
 
 System.prototype.mkId = function() {
@@ -190,29 +182,14 @@ System.prototype.addPendingEvent = function(event, value) {
     this.pendingEvents.push(new EventInstance(event, value));
 }
 
-System.prototype.sendDelayed = function (event, value) {
-    this.delayedSends.push({event:event, value:value});
-}
-
-System.prototype.registerListener = function(source, listener) {
-    this.delayedListeners.push({source:source, listener:listener});
-}
-
 System.prototype.sync = function () {
+    console.log (this.pendingEvents)
+    this.syncMain();
+}
+
+System.prototype.syncMain = function () {
     var i;
     
-    var oldListeners = this.delayedListeners.slice(0);
-    this.delayedListeners = [];
-    for (i = 0; i < oldListeners.length; i++) {
-        oldListeners[i].source.listeners.push(oldListeners[i].listener);
-    }
-    
-    var oldSends = this.delayedSends.slice(0);
-    this.delayedSends = [];
-    for (i = 0; i < oldSends.length; i++) {
-        oldSends[i].event.send(oldSends[i].value);
-    }
-
     var oldPending = this.pendingEvents.slice(0);
     this.pendingEvents = [];
     for (i = 0; i < oldPending.length; i++) {
@@ -220,16 +197,16 @@ System.prototype.sync = function () {
     }
     
     if (this.pendingEvents.length != 0) {
-        this.sync();
+        this.syncMain();
     }
 }
 
 System.prototype.handleTransaction = function (eventInstance) {
     eventInstance.stream.value = eventInstance.value;
     var i; 
-    for (i = 0; i < eventInstance.stream.listeners.length; i++) {
-        var listener = eventInstance.stream.listeners[i].listener;
-        var callback = eventInstance.stream.listeners[i].callback;
+    for (var id in eventInstance.stream.listeners) {
+        var listener = eventInstance.stream.listeners[id].listener;
+        var callback = eventInstance.stream.listeners[id].callback;
         callback(eventInstance.value);
     }
    
@@ -257,9 +234,9 @@ System.prototype.updateBehaviors = function() {
             continue;
 
         // the callbacks may need the old transaction state
-        for (var j = 0; j < copy[behId].listeners.length; j++) {
-            var listener = copy[behId].listeners[j].listener;
-            var callback = copy[behId].listeners[j].callback;
+        for (var id in copy[behId].listeners) { // j = 0; j < copy[behId].listeners.length; j++) {
+            var listener = copy[behId].listeners[id].listener;
+            var callback = copy[behId].listeners[id].callback;
             callback(copy[behId].pending_value);
         }
 
@@ -304,12 +281,13 @@ function switchE(behavior_with_event) {
     var e = new EventStream();
     
     var listener = new Listener(e, function (val) { e.send(val); });
-    behavior_with_event.current_value.listeners.push(listener);
+    behavior_with_event.current_value.listeners[listener.id] = listener;
     
-    behavior_with_event.listeners.push(new Listener({}, function (event) { 
+    var listener2 = new Listener({}, function (event) { 
         behavior_with_event.current_value._unregisterListener(listener);
-        event.listeners.push(listener);
-        }));
+        event.listeners[listener.id] = listener;
+        });
+    behavior_with_event.listeners[listener2.id] = listener2;
     return e;
 }
 
@@ -317,14 +295,15 @@ function switchBeh(behavior_with_behavior) {
     var b = new Behavior(behavior_with_behavior.current_value.current_value);
     var listener = new Listener({}, function (val) {b.update(val); });
 
-    behavior_with_behavior.current_value.listeners.push(listener);
+    behavior_with_behavior.current_value.listeners[listener.id] = listener;
 
-    behavior_with_behavior.listeners.push(new Listener({}, function (beh) {
+    var listener2 = new Listener({}, function (beh) {
         behavior_with_behavior.current_value._unregisterListener(listener);
         b.update(beh.current_value);
         //listener = new Listener({}, function (val) {b.update(val); });
-        beh.listeners.push(listener);
-    }));
+        beh.listeners[listener.id] = listener;
+    });
+    behavior_with_behavior.listeners[listener2.id] = listener2;
 
     return b;
 }
@@ -346,22 +325,26 @@ function hold(initial, event_stream) {
 
 function call(behavior, callback) {
     var b = new Behavior(callback(behavior.current_value));
-    behavior.listeners.push(new Listener(b, function (v) { 
-        b.update(callback(v)); }));
+    var listener = new Listener(b, function (v) { 
+        b.update(callback(v)); });
+
+    behavior.listeners[listener.id] = listener;
     return b;
 }
 
 function apply(beh_a, beh_b, callback) {
     var b = new Behavior(callback(beh_a.current_value, beh_b.current_value));
-    beh_a.listeners.push(new Listener(b, function (val_a) { b.update(callback(val_a, beh_b.current_value)); }));
-    beh_b.listeners.push(new Listener(b, function (val_b) { b.update(callback(beh_a.current_value, val_b)); }));
+    var list_a = new Listener(b, function (val_a) { b.update(callback(val_a, beh_b.current_value)); });
+    var list_b = new Listener(b, function (val_b) { b.update(callback(beh_a.current_value, val_b)); });
+    beh_a.listeners[list_a.id] = list_a;
+    beh_b.listeners[list_b.id] = list_b;
     return b;
 }
 
 function map(event, callback) {
     var e = new EventStream();
     //event._registerListener(e, );
-    system.registerListener(event, new Listener(e, function (val) { e.send(callback(val)); }));
+    event._registerListener(e, function (val) { e.send(callback(val)); });
     return e;
 }
 
@@ -395,7 +378,8 @@ function values(behavior) {
         return behavior._updatesCache;
     }
     var e = new EventStream();
-    system.registerListener(behavior, new Listener(behavior, function (value) { e.send(value); }));//system.sendDelayed(e, value); }));
+    var listener = new Listener(behavior, function (value) { e.send(value); });
+    behavior.listeners[listener.id] = listener;
     behavior._updatesCache = e;
     e.send(behavior.current_value);
     return e;
@@ -407,13 +391,14 @@ function updates(behavior) {
         return behavior._updatesCache;
     }
     var e = new EventStream();
-    system.registerListener(behavior, new Listener(behavior, function (value) { e.send(value); }));//system.sendDelayed(e, value); }));
+    var listener = new Listener(behavior, function (value) { e.send(value); });
+    behavior.listeners[listener.id] = listener;
     behavior._updatesCache = e;
     return e;
 }
 
 function listen(event_stream, callback) {
-    event_stream._registerListener({}, callback);
+    return event_stream._registerListener({}, callback);
 }
 
 function Step(milliseconds) {
@@ -432,123 +417,6 @@ function constMap(event, f) { return map(event, function (v) { return f; }); }
 
 var system = new System();
 never = new EventStream();
-
-function updateSpeed(speed) {
-    return {x:speed.x + 10, y:speed.y};
-}
-
-function capSpeed(speed) {
-    return {x:Math.min(140, speed.x), y:speed.y};
-}
-
-function JumpPlayer() {
-    var collisionEvent = new EventStream();
-    var moveEvent = new EventStream();
-    var jumpEvent = new EventStream();
-    var blockPlaceEvent = new EventStream();
-    
-    var moving = isMoving(moveEvent);
-    
-    var speed = null; 
-    
-    var cap = map(updates(new Delay(function() { return speed; })), function (v) { return capSpeed; });
-    var equals = snapshot(cap, delayBehavior(new Delay(function() { return speed; })), function (capSpeed, oldSpeed) {
-        if (capSpeed.x == oldSpeed.x && capSpeed.y == oldSpeed.y) {
-            return true;
-        }});
-    
-    listen(equals, function (v) { console.log(v); });
-    
-    var increase = map(moveEvent, function (v) { return updateSpeed; });
-    
-    var t = merge(cap, increase);
-    
-    console.log(t);
-    
-    speed = accum({x:100, y:200}, t); //new Behavior({x:100, y:200});
-    
-    listen(updates(speed), function (v) { console.log(v); });
-
-    moveEvent.send({x:0.5, y:0.3});
-    system.sync();
-    moveEvent.send({x:0.1, y:0.05});
-    system.sync();
-    moveEvent.send({x:0.1, y:0.05});
-    system.sync();
-    moveEvent.send({x:0.1, y:0.05});
-    system.sync();
-    moveEvent.send({x:0.1, y:0.05});
-    system.sync();
-    moveEvent.send({x:0.1, y:0.05});
-    system.sync();
-    console.log("end");
-}
-
-function isMoving(moveEvent) {
-    var downEvent = map(moveEvent, function (dir) { if (Math.abs(dir.x) < 0.2 && Math.abs(dir.y) < 0.2) { return false; } else { return true; }});
-    var down = hold(false, downEvent);
-    return down;
-}
-
-function test() {
-    var eventSource = new EventStream();
-    var eventSource2 = new EventStream();
-    
-    var eventEvent = new EventStream();
-
-    var latest = hold(0, eventSource);
-    var addOne = call(latest, function (v) { return v + 1; });
-    
-    var addEvents = updates(addOne);
-    var high = filter(addEvents, function (v) { return (v > 5); });
-    
-    var latest2 = hold(1, eventSource2);
-    
-    var addTwo = apply(latest, latest2, function (a, b) { return a + b; });
-    
-    var behOfEvents = hold(never, eventEvent);
-    
-    var behOfBeh = new Behavior(hold(0, eventSource));
-    var beh_ = switchBeh(behOfBeh);
-    
-    listen(updates(beh_), function (val) { console.log(val); });
-    
-    eventSource.send(1);
-    system.sync();
-    eventSource.send(2);
-    system.sync();
-    behOfBeh.update(hold(3, eventSource2));
-    system.sync();
-    eventSource.send(2);
-    system.sync();
-    console.log("send 3");
-    eventSource2.send(3);
-    system.sync();
-
-
-    listen(switchE(behOfEvents), function (val) { console.log(val); });
-    listen(updates(addTwo), function (val) { console.log(val); });
-    
-    console.log(latest);
-    eventSource.send(2);
-    system.sync();
-    console.log(addOne);
-    console.log(high);
-    eventSource.send(5);
-    eventSource2.send(2);
-    system.sync();
-    console.log(addOne);
-    console.log(addEvents);
-    console.log(high);
-
-    console.log(addTwo);
-    
-    var stream = new EventStream();
-    eventEvent.send(stream);
-    system.sync();
-    stream.send('This is the end');
-    system.sync();
-}
 
 module.exports.listen = listen;
 module.exports.hold = hold;

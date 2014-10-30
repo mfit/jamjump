@@ -481,13 +481,11 @@ class Movement
             setPosition.map ((newPos) -> (oldPos) -> newPos)
         ]
         x = frp.accum 0, posEffects
-        x.updates().listen (log "X")
-        velocity.listen (log "vel")
 
         @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
 
         startMove.listen ((_) =>
-            stopMoveOccured = frp.hold false, (stopMove.constMap true)
+            stopMoveOccured = frp.hold false, (stopMove.constMap true).once()
                 
             timer = (mkCountdown 200).gate (stopMoveOccured.not())
 
@@ -507,15 +505,11 @@ class Movement
                 stopMove.constMap ((v) -> 0.01)
                 frictionEnd.constMap ((v) -> 0.1)
             ]
-            frictionEnd.listen (log "Friction end")
 
             friction = frp.hold ((v) -> (v)), frictionEffects
             accel.values().listen ((v) -> setAccel.send v)
             friction.updates().listen ((f) -> modFriction.send f)
             )
-        stopMove.listen (log "Stopmove")
-        startMove.listen (log "Startmove")
-        friction.listen (log "Friction")
 
         v2 = velocity.map ((x) -> return (new Speed x, 0))
         v2 = frp.apply v2, @direction, ((v, dir) -> dir.times v)
@@ -575,18 +569,6 @@ class Jumping
         @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS - 1)
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
-
-b = new frp.Behavior 0
-
-event = new frp.EventStream
-
-behavior = frp.accum 0, event
-behavior2 = behavior.map ((v) -> v - 1)
-event.send ((v) -> v + 1)
-event.send ((v) -> v + 2)
-
-behavior2.updates().listen (log "Behavior2 updated with")
-frp.system.sync()
 
 module.exports.World = World
 module.exports.MoveEvent = MoveEvent
