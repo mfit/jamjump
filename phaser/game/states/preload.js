@@ -50,9 +50,9 @@ Preload.prototype = {
     this.load.image('winblock', 'assets/BlockDanger.png');
     this.load.image('deathblock', 'assets/lavastein1.png');
 
-    this.load.image('background1', 'assets/bg1_lo.png');
-    this.load.image('background2', 'assets/bg2_lo.png');
-    this.load.image('background3', 'assets/bg3_lo.png');
+    this.load.image('background1', 'assets/g1.png');
+    this.load.image('background2', 'assets/g2.png');
+    this.load.image('background3', 'assets/g3.jpg');
 
     // Create a game setup object
     this.game.gameSetup = new GameSetup();

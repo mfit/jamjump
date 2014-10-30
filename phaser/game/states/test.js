@@ -31,10 +31,12 @@ TestState.prototype = {
         var playerSprite = this.frpPlayer.sprite;
         this.player.sprite = playerSprite;
         this.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
+      
+        var background = this.game.add.sprite('background1', 1);
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
-        //this.game.rootGroup.add(temp_sprite);
+        this.game.rootGroup.add(background);
         //this.game.rootGroup.add(this.wb.block_group);
         this.game.rootGroup.add(playerSprite);
 
