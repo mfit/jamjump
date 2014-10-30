@@ -53,6 +53,8 @@ Preload.prototype = {
     this.load.image('background1', 'assets/g1.png');
     this.load.image('background2', 'assets/g2.png');
     this.load.image('background3', 'assets/g3.jpg');
+      
+    this.load.image('pixel', 'assets/pixel.png');
 
     // Create a game setup object
     this.game.gameSetup = new GameSetup();

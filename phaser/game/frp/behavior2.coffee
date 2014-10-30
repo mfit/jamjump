@@ -167,6 +167,9 @@ class BlockManager
         bm.addedBlock = addBlock
         return bm
 
+class Parallax
+    constructor: ->
+
 class Camera
     constructor: (@tick, @game, world) ->
         @game.camera.bounds = null
@@ -210,6 +213,7 @@ class World
         @players = [new Player game] #, new Player game]
         @worldBlocks = BlockManager.mkBehaviors game
         @camera = new Camera tick, game, this
+        @particles = new ParticleGroup game
 
         for player in @players
            player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
@@ -224,6 +228,42 @@ class World
                 group_sprite.block.touchEvent.send true
                 @players[0].landedOnBlock.send true
             )
+
+class TestFilter extends PIXI.NoiseFilter
+    constructor: ->
+        PIXI.AbstractFilter.call this
+        this.uniforms = 
+            val:
+                type: '1f'
+                value: 0.5
+        @fragmentSrc = [
+            'void main () {'
+            '   gl_FragColor = vec4(1, 0, 0, 1);'
+            '}'
+        ] 
+       
+class ParticleGroup
+    constructor: (game) ->
+        @group = game.add.group();
+
+        for i in [0..100]
+            test = new Phaser.Particle game, i, 200, 'pixel'
+            speed = frp.hold {x:0, y:0}, (tick.map ((_) -> {x:200 * (Math.random() - 0.5), y:200*(Math.random() - 0.5)}))
+
+            integrate = tick.snapshot speed, ((t, v) ->
+                t = t / 1000.0
+                return (oldPos) -> {x: oldPos.x + v.x * t, y: oldPos.y + v.y * t}
+                )
+        
+            position = frp.accum {x:200 * Math.random(), y:200*Math.random()}, integrate
+            position.updates().listen ((test) -> (pos) ->
+                test.x = pos.x
+                test.y = pos.y
+                ) test
+
+            test.scale.set 2, 2
+            test.shader = new TestFilter()
+            @group.add test
 
 class Player
     constructor: (game) ->
@@ -257,7 +297,7 @@ class Player
 
         @position = manyEffects (new Direction 0, 0), effects
         @setPosition = (x, y) -> setPosition.send x, y
-
+        
         @sprite = game.add.sprite 100, 200, 'runner'
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true

@@ -32,17 +32,22 @@ TestState.prototype = {
         this.player.sprite = playerSprite;
         this.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
       
-        var background = this.game.add.sprite('background1', 1);
+        var background3 = this.game.add.sprite (0, 0, 'background3');
+        var background2 = this.game.add.sprite (0, this.game.height - 116 - 100, 'background2');
+        var background1 = this.game.add.sprite (0, this.game.height - 70 - 100, 'background1');
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
-        this.game.rootGroup.add(background);
-        //this.game.rootGroup.add(this.wb.block_group);
+        this.game.rootGroup.add(background3);
+        this.game.rootGroup.add(background2);
+        this.game.rootGroup.add(background1);
+        this.game.rootGroup.add(this.frpWorld.worldBlocks.current_value.block_group);
         this.game.rootGroup.add(playerSprite);
+        this.game.rootGroup.add(this.frpWorld.particles.group);
 
 
         // Set 1 color bg
-        this.game.stage.backgroundColor = 0x333333;
+        this.game.stage.backgroundColor = 0x91a477;
         this.moving = false;
         this.jumpDown = false;
         this.blockSetDown = false;
