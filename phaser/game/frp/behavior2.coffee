@@ -169,11 +169,17 @@ class Camera
 
         world.players[0].position.updates().listen ((pos) =>
             distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
+            distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
             if (Math.abs distance) > 200
                  if (distance > 0)
                     @game.camera.x = @game.camera.x + (-distance + 200)
                  else if distance < 0
                     @game.camera.x = @game.camera.x + (-distance - 200)
+            if (Math.abs distance_y) > 200
+                if distance > 0
+                    @game.camera.y += (-distance_y - 200)
+                else if distance < 0
+                    @game.camera.y += (-distance_y + 200)
             )
 
         @shakeIt()
@@ -436,17 +442,84 @@ class Movement2
 
 class Movement
     constructor: (@tick, @player) ->
-        # @BASESPEED = 300
-        # @baseSpeed = new frp.Behavior (new Speed @BASESPEED, 0)
-        # @totalSpeed = @baseSpeed
-        # @movingDirection = frp.hold Direction.null(), (@player.moveEvent.map ((e) ->
-        #         e.dir))
-        # @value = @tick.onTick (@movingDirection.apply @totalSpeed, ((dir, speed) -> dir.times speed))
+        @MAXSPEED = new Speed 300, 0
         @BASESPEED = new Speed 300, 0
-        @movingDirection = frp.hold Direction.null(), (@player.moveEvent.map ((e) ->
-            e.dir))
 
-        @value = (@movingDirection.map ((dir) => dir.times @BASESPEED))
+        stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
+        startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
+
+        setAccel = new frp.EventStream
+        setFriction = new frp.EventStream
+        modFriction = new frp.EventStream
+        setVelocity = new frp.EventStream
+        setPosition = new frp.EventStream
+
+        frictionEffects = frp.mergeAll [
+            setFriction.map ((newF) -> (oldF) -> newF)
+            modFriction
+        ]
+        
+        friction = frp.accum 0.1, frictionEffects
+
+        aEffects = frp.mergeAll [
+           setAccel.map ((newA) -> (oldA) -> newA)
+        ]
+
+        accel = frp.accum 0, aEffects
+
+        velEffects = frp.mergeAll [
+            @tick.snapshot accel, ((t, a) -> (v) -> v + a * t / 1000.0)
+            @tick.snapshot friction, ((t, friction) -> (oldV) -> oldV - oldV * friction)
+            setVelocity.map ((newV) -> (oldV) -> newV)
+        ]
+
+        baseVelocity = frp.accum 0, velEffects
+        velocity = baseVelocity.map ((v) -> upperCap v, 100)
+
+        posEffects = frp.mergeAll [
+            @tick.snapshot velocity, ((t, v) -> (s) -> s + v * t / 1000.0)
+            setPosition.map ((newPos) -> (oldPos) -> newPos)
+        ]
+        x = frp.accum 0, posEffects
+        x.updates().listen (log "X")
+        velocity.listen (log "vel")
+
+        @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
+
+        startMove.listen ((_) =>
+            stopMoveOccured = frp.hold false, (stopMove.constMap true)
+                
+            timer = (mkCountdown 200).gate (stopMoveOccured.not())
+
+            accelEnds = frp.mergeAll [
+                timer.constMap 0
+                stopMove.constMap 0
+            ]
+            accel = frp.hold (1000), accelEnds
+
+            frictionEnd = onEventDo stopMove, never, ((e) ->
+                startMoveOccured = frp.hold false, (startMove.constMap true)
+                return (mkCountdown 300).gate (startMoveOccured.not())
+                )
+
+            frictionEffects = frp.mergeAll [
+                timer.constMap ((v) -> 0)
+                stopMove.constMap ((v) -> 0.01)
+                frictionEnd.constMap ((v) -> 0.1)
+            ]
+            frictionEnd.listen (log "Friction end")
+
+            friction = frp.hold ((v) -> (v)), frictionEffects
+            accel.values().listen ((v) -> setAccel.send v)
+            friction.updates().listen ((f) -> modFriction.send f)
+            )
+        stopMove.listen (log "Stopmove")
+        startMove.listen (log "Startmove")
+        friction.listen (log "Friction")
+
+        v2 = velocity.map ((x) -> return (new Speed x, 0))
+        v2 = frp.apply v2, @direction, ((v, dir) -> dir.times v)
+        @value = v2 #(@movingDirection.map ((dir) => dir.times @BASESPEED))
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
 upperCap = (v, cap) -> if v > cap then return cap else v

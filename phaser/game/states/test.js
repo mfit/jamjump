@@ -46,7 +46,7 @@ TestState.prototype = {
 
         // Set 1 color bg
         this.game.stage.backgroundColor = 0x91a477;
-        this.moving = false;
+        this.moving = 0;
         this.jumpDown = false;
         this.blockSetDown = false;
         this.qDown = false;
@@ -93,17 +93,17 @@ TestState.prototype = {
           this.frpPlayer.setBlockEvent.send(true);
       }
 
-      if (this.moving === false && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
+      if (this.moving !== -1 && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
           this.frpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
-          this.moving = true;
+          this.moving = -1;
       }
-      if (this.moving === false && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
+      if (this.moving !== 1 && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
           this.frpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
-          this.moving = true;
+          this.moving = 1;
       }
 
-      if (!keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
-          this.moving = false;
+      if (this.moving !== 0 && !(keyboard.isDown(Phaser.Keyboard.A) || keyboard.isDown(Phaser.Keyboard.D))) {
+          this.moving = 0;
           this.frpPlayer.moveEvent.send(new b.StopMoveEvent());
       }
 

@@ -6,6 +6,10 @@ function Behavior(value) {
     this.id = system.mkId();
 }
 
+Behavior.prototype.listen = function (f) {
+    return this.updates().listen(f);
+}
+
 Behavior.prototype.not = function() {
     b = this.map(function (val) { return !val; });
     return b
@@ -33,6 +37,10 @@ Behavior.prototype.apply = function (beh, callback) {
 
 Behavior.prototype.updates = function () {
     return updates(this);
+}
+
+Behavior.prototype.values = function () {
+    return values(this);
 }
 
 // Dont use this
@@ -380,6 +388,18 @@ function gate(event, behavior) {
         }
     });
     return e;
+}
+
+function values(behavior) {
+    if (behavior.hasOwnProperty('_updatesCache')) {
+        return behavior._updatesCache;
+    }
+    var e = new EventStream();
+    system.registerListener(behavior, new Listener(behavior, function (value) { e.send(value); }));//system.sendDelayed(e, value); }));
+    behavior._updatesCache = e;
+    e.send(behavior.current_value);
+    return e;
+
 }
 
 function updates(behavior) {
