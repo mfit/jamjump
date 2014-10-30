@@ -10013,4 +10013,7 @@
    <tile gid="0"/>
   </data>
  </layer>
+ <imagelayer name="Image Layer 1">
+  <image source="../w1.png"/>
+ </imagelayer>
 </map>

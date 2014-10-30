@@ -203,7 +203,11 @@ class Camera
 
 class World
     constructor: (game) ->
-        @players = [new Player game] #, new Player game]
+        @players = [
+            new Player game, "p1"
+            new Player game, "p2"
+            new Player game, "p3"
+        ]
         @worldBlocks = BlockManager.mkBehaviors game
         @camera = new Camera tick, game, this
         @particles = new ParticleGroup game
@@ -234,11 +238,14 @@ class World
                 @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
                 )
 
-        preTick.onTickDo @worldBlocks, ((blockManager) =>
-            game.physics.arcade.collide blockManager.block_group, @players[0].sprite, (sprite, group_sprite) =>
-                group_sprite.block.touchEvent.send true
-                @players[0].landedOnBlock.send true
-            )
+           preTick.onTickDo @worldBlocks, (((player) => (blockManager) =>
+                game.physics.arcade.collide blockManager.block_group, player.sprite, (sprite, group_sprite) =>
+                    group_sprite.block.touchEvent.send true
+                    player.landedOnBlock.send true
+                ) player)
+
+    save: ->
+    reload: ->
 
 class TestFilter extends PIXI.AbstractFilter
     constructor: (r, g, b) ->
@@ -320,7 +327,7 @@ class ParticleGroup
             @group.add innerGlow
 
 class Player
-    constructor: (game) ->
+    constructor: (game, @name="p") ->
         @moveEvent = new frp.EventStream
         @jumpEvent = new frp.EventStream
         @setBlockEvent = new frp.EventStream
@@ -353,7 +360,7 @@ class Player
         @setPosition = (x, y) -> setPosition.send x, y
 
         @sprite = game.add.sprite 100, 200, 'runner'
-        @sprite.shader = new TestFilter 200, 0, 0
+        #@sprite.shader = new TestFilter 200, 0, 0
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true
         @sprite.body.setSize 7, 28, 3, 0

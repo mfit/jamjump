@@ -25,11 +25,6 @@ TestState.prototype = {
         this.frpPlayer = this.frpWorld.players[0];
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
-        var player = {}
-        player.name = "Player";
-        this.player = player;
-        var playerSprite = this.frpPlayer.sprite;
-        this.player.sprite = playerSprite;
         this.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(this.frpWorld));
 
         var background3 = this.game.add.sprite (0, 0, 'background3');
@@ -42,7 +37,9 @@ TestState.prototype = {
         this.game.rootGroup.add(background2);
         this.game.rootGroup.add(background1);
         this.game.rootGroup.add(this.frpWorld.worldBlocks.current_value.block_group);
-        this.game.rootGroup.add(playerSprite);
+        for (var i = 0; i < this.frpWorld.players.length; i++) {
+            this.game.rootGroup.add(this.frpWorld.players[i].sprite);
+        }
         this.game.rootGroup.add(this.frpWorld.particles.group);
         this.game.rootGroup.add(this.frpWorld.trees);
 
@@ -54,6 +51,8 @@ TestState.prototype = {
         this.blockSetDown = false;
         this.qDown = false;
         this.eDown = false;
+        this.currentPlayer = 0;
+        this.jDown = false;
   },
   getId: function() {
       return -1;
@@ -62,9 +61,22 @@ TestState.prototype = {
       //this.wb.update();
       var that = this;
 
-      this.frpPlayer.setPosition(new b.Direction (this.player.sprite.body.x, this.player.sprite.body.y));
-
       var keyboard = this.game.input.keyboard;
+
+      if (this.jDown === false && keyboard.isDown(Phaser.Keyboard.J)) {
+          this.jDown = true;
+          this.currentPlayer += 1;
+          this.frpPlayer = this.frpWorld.players[this.currentPlayer % this.frpWorld.players.length];
+      }
+      if (this.jDown === true && !keyboard.isDown(Phaser.Keyboard.J)) {
+          this.jDown = false;
+      }
+     
+      for (var i = 0; i < this.frpWorld.players.length; i++) {
+        this.frpWorld.players[i].setPosition(new b.Direction (
+            this.frpWorld.players[i].sprite.body.x, this.frpWorld.players[i].sprite.body.y));
+      }
+
 
       if (keyboard.isDown(Phaser.Keyboard.P)) {
           console.log("Player", this.frpPlayer);
