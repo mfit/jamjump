@@ -19,6 +19,9 @@ TestState.prototype = {
         this.moveEvent = new frp.EventStream();
       
         this.frpWorld = new b.World(this.game);
+        this.game.world.width = 20000;
+        this.game.world.height = 5000;
+
         this.frpPlayer = this.frpWorld.players[0];
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -96,6 +99,10 @@ TestState.prototype = {
           this.eDown = true;
       } else if (this.qDown === true && !keyboard.isDown(Phaser.Keyboard.E)) {
           this.eDown = false;
+      }
+      
+      if (keyboard.isDown(Phaser.Keyboard.F)) {
+          this.frpWorld.camera.shakeMe.send(true);
       }
 
       // update stuff

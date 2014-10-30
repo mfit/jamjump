@@ -118,7 +118,7 @@ LoadTiledAtlas = function (game, tilemap) {
             }
             frames.push(frame);
         }
-        game.load.atlas("test", "assets/spritesheet.png", null, {frames:frames}, Phaser.Loader.TEXTURE_ATLAS_JSON_ARRAY);
+        game.load.atlas("test", "assets/tileset.png", null, {frames:frames}, Phaser.Loader.TEXTURE_ATLAS_JSON_ARRAY);
     }
 }
 

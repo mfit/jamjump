@@ -10,7 +10,7 @@ preTick = new frp.EventStream
 mkCountdown = (initial) ->
     counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v))) 
     finished = counter.updates().filter ((v) -> v < 0)
-    return finished.constMap true
+    return (finished.constMap true).once()
 
 class Movement
         
@@ -54,7 +54,7 @@ class DefaultBlock
     constructor: ->
         @texture = 'redboxblock'
         @touchEvent = new frp.EventStream
-        @gid = 124
+        @gid = 1
 
 class TempBlock
     constructor: () ->
@@ -67,7 +67,7 @@ class StoneBlock
     constructor: ->
         @texture = 'stoneblock'
         @touchEvent = new frp.EventStream
-        @gid = 304
+        @gid = 1
 
 class DeathBlock
     constructor: ->
@@ -90,7 +90,7 @@ class BlockManager
         @block_group.allowGravity = false;
         @block_group.immovable = true;
 
-        @blockSize = 19
+        @blockSize = 25
 
     toWorldCoords: (x, y) ->
         return {x:x*@blockSize, y:y*@blockSize}
@@ -114,16 +114,19 @@ class BlockManager
         block.x = x
         block.y = y
 
-        console.log (block.gid)
         coords = @toWorldCoords x, y
 
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
-        block.sprite = @game.add.tileSprite (coords.x), (coords.y), set.tileWidth, set.tileHeight, "test", block.gid
+
+        console.log "set", set
+        console.log "coords", coords
+        block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
+                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
         block.sprite = @block_group.add block.sprite
         #block.sprite.loadTexture block.texture, 1
         block.sprite.body.immovable = true
-        block.sprite.body.setSize 20, 20, 2, 2
+        block.sprite.body.setSize 25, 25, 12, 12
         block.sprite.block = block
 
     removeBlock: (x, y) ->
@@ -164,15 +167,53 @@ class BlockManager
         bm.addedBlock = addBlock
         return bm
 
+class Camera
+    constructor: (@tick, @game, world) ->
+        @game.camera.bounds = null
+
+        world.players[0].position.updates().listen ((pos) =>
+            distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
+            if (Math.abs distance) > 200
+                 if (distance > 0)
+                    @game.camera.x = @game.camera.x + (-distance + 200)
+                 else if distance < 0
+                    @game.camera.x = @game.camera.x + (-distance - 200)
+            )
+
+        @shakeIt()
+
+    shakeIt: ->
+        @shakeMe = new frp.EventStream
+
+        # effects = [
+        #     @tick.map ((t) -> (a) -> 
+        # ]
+
+
+        reset = new frp.EventStream 
+        effects = [
+            reset.constMap (new frp.Behavior 0)
+            @shakeMe.map ((v) =>
+                timer = (mkCountdown 300)
+                counter = frp.accum 10, (@tick.map ((t) -> (a) -> a - t/10.0))
+                rotation = counter.map ((v) -> (Math.sin v) / 16) # frp.hold 0 (@tick.map ((t) -> Math.sin t)) #frp.accum 0 effects
+                timer.listen ((_) -> reset.send true)
+                return rotation
+            )
+        ]
+        rotating = frp.hold (new frp.Behavior 0), (frp.mergeAll effects)
+        rotating = frp.switchBeh rotating
+        rotating.updates().listen ((v) => @game.world.rotation = v)
+
 class World
     constructor: (game) ->
         @players = [new Player game] #, new Player game]
         @worldBlocks = BlockManager.mkBehaviors game
+        @camera = new Camera tick, game, this
 
         for player in @players
            player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
-                gridsize = 19;
-                console.log pos
+                gridsize = 25;
                 x = Math.floor(pos.x / gridsize)
                 y = Math.floor(pos.y / gridsize + 1)
                 @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
@@ -220,7 +261,7 @@ class Player
         @sprite = game.add.sprite 100, 200, 'runner'
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true
-        @sprite.body.setSize 14, 14, 2, 10
+        @sprite.body.setSize 12, 23, 7, 1
         @sprite.body.gravity.y = 1050
         @sprite.allowGravity = true
 
