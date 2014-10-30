@@ -8,12 +8,12 @@ tick = new frp.EventStream
 preTick = new frp.EventStream
 
 mkCountdown = (initial) ->
-    counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v))) 
+    counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v)))
     finished = counter.updates().filter ((v) -> v < 0)
     return (finished.constMap true).once()
 
 class Movement
-        
+
 # combine events and their effects
 manyConstEffects = (initial, effects) ->
     funcs = []
@@ -134,23 +134,19 @@ class BlockManager
             block = @blocks[y][x]
             block.sprite.kill()
             delete @blocks[y][x]
-        
+
     copy: (mgr) ->
 
     @mkBehaviors: (game) ->
         # command events
-        addBlock = new frp.EventStream
+        addBlock = new frp.EventStream # addBlock {x:x, y:y, block: new Block()}
         removeBlock = new frp.EventStream
-
-        # command executed events
-        addedBlock = new frp.EventStream
-        removedBlock = new frp.EventStream
 
         effects = [
            addBlock.map ((blockInfo) -> (bm) ->
                 block = blockInfo.block
-                bm.addBlock blockInfo.x, blockInfo.y, block
-                if block.removeMeEvent 
+                bm.addBlock blockInfo.x, blockInfo.y, block # FIXME test if block was added
+                if block.removeMeEvent
                     block.removeMeEvent.listen ((v) -> removeBlock.send block)
                 return bm
                 )
@@ -163,8 +159,6 @@ class BlockManager
         bm = frp.accum (new BlockManager(game)), frp.mergeAll effects
         bm.addBlock = addBlock
         bm.removeBlock = removeBlock
-
-        bm.addedBlock = addBlock
         return bm
 
 class Parallax
@@ -189,11 +183,11 @@ class Camera
         @shakeMe = new frp.EventStream
 
         # effects = [
-        #     @tick.map ((t) -> (a) -> 
+        #     @tick.map ((t) -> (a) ->
         # ]
 
 
-        reset = new frp.EventStream 
+        reset = new frp.EventStream
         effects = [
             reset.constMap (new frp.Behavior 0)
             @shakeMe.map ((v) =>
@@ -232,7 +226,7 @@ class World
 class TestFilter extends PIXI.AbstractFilter
     constructor: (r, g, b) ->
         PIXI.AbstractFilter.call this
-        this.uniforms = 
+        this.uniforms =
             color:
                 type: '3f'
                 value: {x:r/255.0, y:g/255.0, z:b/255.0}
@@ -242,8 +236,8 @@ class TestFilter extends PIXI.AbstractFilter
             'void main () {'
             '   gl_FragColor = vec4(color, 1);'
             '}'
-        ] 
-       
+        ]
+
 class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();
@@ -251,7 +245,7 @@ class ParticleGroup
         for i in [0..50]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
-        
+
             accel = frp.hold {x:0, y:0}, (tick.map ((_) -> {x:200 * (Math.random() - 0.5), y:200*(Math.random() - 0.5)}))
             integrateAccel = tick.snapshot accel, ((t, a) ->
                 t = t / 1000.0
@@ -264,7 +258,7 @@ class ParticleGroup
                 t = t / 1000.0
                 return (oldPos) -> {x: oldPos.x + v.x * t, y: oldPos.y + v.y * t}
                 )
-        
+
             position = frp.accum {x:200 * Math.random(), y:200*Math.random()}, integrate
             position.updates().listen ((test, test2) -> (pos) ->
                 test.x = pos.x
@@ -314,7 +308,7 @@ class Player
 
         @position = manyEffects (new Direction 0, 0), effects
         @setPosition = (x, y) -> setPosition.send x, y
-        
+
         @sprite = game.add.sprite 100, 200, 'runner'
         @sprite.shader = new TestFilter 200, 0, 0
         game.physics.enable @sprite, Phaser.Physics.ARCADE
@@ -329,7 +323,7 @@ class Player
 
 # TODO splats for arbitary number of arguments
 selector = (initial, choices, arg1, arg2) ->
-    setter = new frp.EventStream 
+    setter = new frp.EventStream
     choice = setter.map ((e) -> choices[e](arg1, arg2)) # Event (Behavior)
 
     # frp.hold initial, choice # Behavior (Behavior)
@@ -388,8 +382,8 @@ class Movement2
 
         speed = frp.switchBeh (manyConstEffects (new frp.Behavior 0), effects)
         @speed = speed.map ((speed) -> new Speed speed, 0)
-        @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed)) 
-        
+        @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed))
+
 class Movement
     constructor: (@tick, @player) ->
         # @BASESPEED = 300
@@ -401,7 +395,7 @@ class Movement
         @BASESPEED = new Speed 300, 0
         @movingDirection = frp.hold Direction.null(), (@player.moveEvent.map ((e) ->
             e.dir))
-            
+
         @value = (@movingDirection.map ((dir) => dir.times @BASESPEED))
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
@@ -415,13 +409,13 @@ class BlockSetter
         @BLOCKCOST = 50
         @MINPOWER = 0
 
-        
+
         setFull = new frp.EventStream
         full = frp.hold false, setFull
 
         refill = @tick.gate (full.not())
         refill = refill.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
-        
+
         effects = [
                 refill
                 @blockSet.constMap ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
@@ -454,7 +448,7 @@ class Jumping
                 (@player.jumpEvent.constMap inc)
                 (@player.landedOnBlock.constMap (constant 0))
         ])
-        
+
         @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS - 1)
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
@@ -462,7 +456,7 @@ class Jumping
 b = new frp.Behavior 0
 
 event = new frp.EventStream
-        
+
 behavior = frp.accum 0, event
 behavior2 = behavior.map ((v) -> v - 1)
 event.send ((v) -> v + 1)
