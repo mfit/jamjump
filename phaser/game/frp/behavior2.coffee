@@ -229,16 +229,18 @@ class World
                 @players[0].landedOnBlock.send true
             )
 
-class TestFilter extends PIXI.NoiseFilter
-    constructor: ->
+class TestFilter extends PIXI.AbstractFilter
+    constructor: (r, g, b) ->
         PIXI.AbstractFilter.call this
         this.uniforms = 
-            val:
-                type: '1f'
-                value: 0.5
+            color:
+                type: '3f'
+                value: {x:r/255.0, y:g/255.0, z:b/255.0}
         @fragmentSrc = [
+            'precision mediump float;'
+            'uniform vec3 color;'
             'void main () {'
-            '   gl_FragColor = vec4(1, 0, 0, 1);'
+            '   gl_FragColor = vec4(color, 1);'
             '}'
         ] 
        
@@ -246,9 +248,17 @@ class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();
 
-        for i in [0..100]
-            test = new Phaser.Particle game, i, 200, 'pixel'
-            speed = frp.hold {x:0, y:0}, (tick.map ((_) -> {x:200 * (Math.random() - 0.5), y:200*(Math.random() - 0.5)}))
+        for i in [0..50]
+            innerGlow = new Phaser.Particle game, i, 200, 'pixel'
+            outerGlow = new Phaser.Particle game, i, 200, 'pixel'
+        
+            accel = frp.hold {x:0, y:0}, (tick.map ((_) -> {x:200 * (Math.random() - 0.5), y:200*(Math.random() - 0.5)}))
+            integrateAccel = tick.snapshot accel, ((t, a) ->
+                t = t / 1000.0
+                return (oldSpeed) -> {x : oldSpeed.x + a.x * t, y : oldSpeed.y + a.y * t}
+                )
+
+            speed = frp.accum {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}, integrateAccel
 
             integrate = tick.snapshot speed, ((t, v) ->
                 t = t / 1000.0
@@ -256,14 +266,21 @@ class ParticleGroup
                 )
         
             position = frp.accum {x:200 * Math.random(), y:200*Math.random()}, integrate
-            position.updates().listen ((test) -> (pos) ->
+            position.updates().listen ((test, test2) -> (pos) ->
                 test.x = pos.x
                 test.y = pos.y
-                ) test
+                test2.x = pos.x - 1
+                test2.y = pos.y - 1
+                test2.scale.set (2 + (Math.random())*5), (2 + (Math.random())*5)
+                ) innerGlow, outerGlow
 
-            test.scale.set 2, 2
-            test.shader = new TestFilter()
-            @group.add test
+            innerGlow.scale.set 2, 2
+            outerGlow.scale.set 4, 4
+
+            innerGlow.shader = new TestFilter 77, 233, 57
+            outerGlow.shader = new TestFilter 200, 233, 57
+            @group.add outerGlow
+            @group.add innerGlow
 
 class Player
     constructor: (game) ->
@@ -299,6 +316,7 @@ class Player
         @setPosition = (x, y) -> setPosition.send x, y
         
         @sprite = game.add.sprite 100, 200, 'runner'
+        @sprite.shader = new TestFilter 200, 0, 0
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true
         @sprite.body.setSize 7, 28, 3, 0
