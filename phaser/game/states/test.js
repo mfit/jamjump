@@ -63,6 +63,7 @@ TestState.prototype = {
   },
   update: function () {
       //this.wb.update();
+      console.log ("TICK")
       var that = this;
 
       var keyboard = this.game.input.keyboard;

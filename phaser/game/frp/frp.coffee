@@ -729,5 +729,6 @@ module.exports =
     execute:execute
     pure:pure
     constMap:constMap
+    mapE:mapE
     sync: (f) ->
         system.sync f
