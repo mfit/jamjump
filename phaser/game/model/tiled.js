@@ -24,13 +24,11 @@ TiledLoader.prototype.create = function(adder) {
     
     for (var tileset in this.loaded_images) {
         tiled_map.addTilesetImage(tileset, tileset);
-        console.log(tileset);
     }
     
     for (var layer_id in this.layer_names) {
         var layer_name = this.layer_names[layer_id];
         //this.layers[layer_name] = tiled_map.createLayer(layer_name);
-        console.log(tiled_map);
     }
     
     this.tiled_map = tiled_map;
@@ -79,7 +77,6 @@ function BlockLayerInterpreter(baseInterpreter) {
 BlockLayerInterpreter.prototype = new LayerInterpreter();
 BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
     if (tile.properties.hasOwnProperty('type')) {
-        console.log(tile);
         var block = null;
         switch (tile.properties['type']) {
             case 'DefaultBlock':
@@ -128,6 +125,7 @@ MakeObjectLayerSprites = function (game, tilemap, layerName) {
         var objectGid = objectData[i].gid
         var tilesetIndex = tilemap.tiles[objectGid][2];
         var set = tilemap.tilesets[tilesetIndex];
+
         var sprite = game.add.tileSprite(objectData[i].x, objectData[i].y, set.tileWidth, set.tileHeight, "test", objectGid);
         return sprite;
     }

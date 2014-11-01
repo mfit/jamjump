@@ -1,4 +1,5 @@
-frp = require '../frp/behavior.js'
+#frp = require '../frp/behavior.js'
+frp = require '../frp/frp.js'
 
 inc = (x) -> (x + 1)
 dec = (x) -> (x - 1)
@@ -21,14 +22,6 @@ manyConstEffects = (initial, effects) ->
     for effect in effects
         [event, func] = effect
         funcs.push (event.constMap func)
-    effects = frp.mergeAll funcs
-    return (effects.accum initial, effects)
-
-manyEffects = (initial, effects) ->
-    funcs = []
-    for effect in effects
-        [event, func] = effect
-        funcs.push (event.map func)
     effects = frp.mergeAll funcs
     return (effects.accum initial, effects)
 
@@ -155,7 +148,7 @@ class BlockManager
                 )
         ]
 
-        bm = frp.accum (new BlockManager(game)), frp.mergeAll effects
+        bm = frp.accum (new BlockManager(game)), (frp.mergeAll effects).mkUpdateEvent()
         bm.addBlock = addBlock
         bm.removeBlock = removeBlock
         return bm
@@ -167,20 +160,20 @@ class Camera
     constructor: (@tick, @game, world) ->
         @game.camera.bounds = null
 
-        world.players[0].position.updates().listen ((pos) =>
-            distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
-            distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
-            if (Math.abs distance) > 200
-                 if (distance > 0)
-                    @game.camera.x = @game.camera.x + (-distance + 200)
-                 else if distance < 0
-                    @game.camera.x = @game.camera.x + (-distance - 200)
-            if (Math.abs distance_y) > 200
-                if distance > 0
-                    @game.camera.y += (-distance_y - 200)
-                else if distance < 0
-                    @game.camera.y += (-distance_y + 200)
-            )
+        # world.players[0].position.updates().listen ((pos) =>
+        #     distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
+        #     distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
+        #     if (Math.abs distance) > 200
+        #          if (distance > 0)
+        #             @game.camera.x = @game.camera.x + (-distance + 200)
+        #          else if distance < 0
+        #             @game.camera.x = @game.camera.x + (-distance - 200)
+        #     if (Math.abs distance_y) > 200
+        #         if distance > 0
+        #             @game.camera.y += (-distance_y - 200)
+        #         else if distance < 0
+        #             @game.camera.y += (-distance_y + 200)
+        #     )
 
         @shakeIt()
 
@@ -211,8 +204,8 @@ class World
     constructor: (game) ->
         @players = [
             new Player game, "p1"
-            new Player game, "p2"
-            new Player game, "p3"
+            #new Player game, "p2"
+            #new Player game, "p3"
         ]
         @worldBlocks = BlockManager.mkBehaviors game
         @camera = new Camera tick, game, this
@@ -237,18 +230,23 @@ class World
         @trees.add @trees_high
 
         for player in @players
-           player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
+            setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
+                console.log "set block"
                 gridsize = 25;
                 x = Math.floor(pos.x / gridsize)
                 y = Math.floor(pos.y / gridsize + 1)
                 @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
                 )
+            # side effects
+            setting.listen ((v) -> )
 
-           preTick.onTickDo @worldBlocks, (((player) => (blockManager) =>
-                game.physics.arcade.collide blockManager.block_group, player.sprite, (sprite, group_sprite) =>
-                    group_sprite.block.touchEvent.send true
-                    player.landedOnBlock.send true
-                ) player)
+            s = preTick.onTickDo @worldBlocks, (((player) => (blockManager) =>
+                 game.physics.arcade.collide blockManager.block_group, player.sprite, (sprite, group_sprite) =>
+                     group_sprite.block.touchEvent.send true
+                     player.landedOnBlock.send true
+                 ) player)
+            # side effects
+            s.listen ((v) ->)
 
     save: ->
     reload: ->
@@ -356,13 +354,16 @@ class Player
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
         setPosition = new frp.EventStream
+
+        int = tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)
+    
         effects = [
-            [setPosition, (pos) -> (oldPos) -> pos]
-            [(tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)), (dPos) -> (pos) ->
-                    new Direction (pos.x + dPos), (pos.y)]
+            setPosition.map ((pos) -> (oldPos) -> pos)
+            int.map ((dPos) -> (pos) ->
+                    new Direction (pos.x + dPos), (pos.y))
         ]
 
-        @position = manyEffects (new Direction 0, 0), effects
+        @position = frp.accum (new Direction 0, 0), (frp.mergeAll effects)
         @setPosition = (x, y) -> setPosition.send x, y
 
         @sprite = game.add.sprite 100, 200, 'runner'
@@ -373,13 +374,15 @@ class Player
         @sprite.body.gravity.y = 1050
         @sprite.allowGravity = true
 
-        @jumping.value.listen ((vy) => @sprite.body.velocity.y -= vy)
+        @jumping.value.listen ((vy) =>
+            @sprite.body.velocity.y -= vy)
 
         t = tick.onTickDo (@movement), ((speed) => @sprite.body.velocity.x = speed.vx)
+        t.listen ((v) ->)
 
 # TODO splats for arbitary number of arguments
 selector = (initial, choices, arg1, arg2) ->
-    setter = new frp.EventStream
+    setter = new frp.EventStream()
     choice = setter.map ((e) -> choices[e](arg1, arg2)) # Event (Behavior)
 
     # frp.hold initial, choice # Behavior (Behavior)
@@ -436,16 +439,16 @@ class Movement2
                     frp.accum @BASESPEED, @tick.map ((t) => ((speed) => upperCap (t/4.0 + speed), @MAXSPEED))]
         ]
 
-        speed = frp.switchBeh (manyConstEffects (new frp.Behavior 0), effects)
-        @speed = speed.map ((speed) -> new Speed speed, 0)
-        @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed))
+        # speed = frp.switchBeh (manyConstEffects (new frp.Behavior 0), effects)
+        # @speed = speed.map ((speed) -> new Speed speed, 0)
+        # @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed))
+        @value = pure (new Speed 0, 0)
 
 class Movement
     constructor: (@tick, @player) ->
         @MAXSPEED = new Speed 300, 0
         @BASESPEED = new Speed 300, 0
 
-        stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
         startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
 
         setAccel = new frp.EventStream
@@ -454,15 +457,20 @@ class Movement
         setVelocity = new frp.EventStream
         setPosition = new frp.EventStream
 
+        fric_ = {ref:null}
+        accel_ = {ref:null}
+        frictionModders = fric_
+
         frictionEffects = frp.mergeAll [
             setFriction.map ((newF) -> (oldF) -> newF)
-            modFriction
+            fric_
         ]
         
         friction = frp.accum 0.1, frictionEffects
 
         aEffects = frp.mergeAll [
            setAccel.map ((newA) -> (oldA) -> newA)
+           accel_
         ]
 
         accel = frp.accum 0, aEffects
@@ -470,11 +478,11 @@ class Movement
         velEffects = frp.mergeAll [
             @tick.snapshot accel, ((t, a) -> (v) -> v + a * t / 1000.0)
             @tick.snapshot friction, ((t, friction) -> (oldV) -> oldV - oldV * friction)
-            setVelocity.map ((newV) -> (oldV) -> newV)
+            #setVelocity.map ((newV) -> (oldV) -> newV)
         ]
 
         baseVelocity = frp.accum 0, velEffects
-        velocity = baseVelocity.map ((v) -> upperCap v, 100)
+        velocity = baseVelocity.map ((v) -> upperCap v, 200)
 
         posEffects = frp.mergeAll [
             @tick.snapshot velocity, ((t, v) -> (s) -> s + v * t / 1000.0)
@@ -484,21 +492,24 @@ class Movement
 
         @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
 
-        startMove.listen ((_) =>
+        eventfulBehaviors = frp.execute (startMove.constMap ((_) =>
+            stopMove = @player.moveEvent.filter ((e) ->
+               return e instanceof StopMoveEvent)
             stopMoveOccured = frp.hold false, (stopMove.constMap true).once()
-                
             timer = (mkCountdown 200).gate (stopMoveOccured.not())
 
             accelEnds = frp.mergeAll [
                 timer.constMap 0
                 stopMove.constMap 0
             ]
-            accel = frp.hold (1000), accelEnds
+            accel = frp.hold (1500), accelEnds
 
-            frictionEnd = onEventDo stopMove, never, ((e) ->
+            frictionEnd = frp.execute (stopMove.constMap ((_) ->
                 startMoveOccured = frp.hold false, (startMove.constMap true)
                 return (mkCountdown 300).gate (startMoveOccured.not())
-                )
+                ))
+            frictionEnd = frp.switchE (frp.hold frp.never, frictionEnd)
+            #frictionEnd = switchE
 
             frictionEffects = frp.mergeAll [
                 timer.constMap ((v) -> 0)
@@ -507,10 +518,12 @@ class Movement
             ]
 
             friction = frp.hold ((v) -> (v)), frictionEffects
-            accel.values().listen ((v) -> setAccel.send v)
-            friction.updates().listen ((f) -> modFriction.send f)
-            )
+            return [((frp.values accel).map ((v) -> (a) -> v)), frictionEffects]
+            ))
 
+        accel_.ref = frp.switchE (frp.hold frp.never, (eventfulBehaviors.at 0))
+        fric_.ref = frp.switchE (frp.hold (frp.never), (eventfulBehaviors.at 1))
+        
         v2 = velocity.map ((x) -> return (new Speed x, 0))
         v2 = frp.apply v2, @direction, ((v, dir) -> dir.times v)
         @value = v2 #(@movingDirection.map ((dir) => dir.times @BASESPEED))
@@ -520,32 +533,30 @@ upperCap = (v, cap) -> if v > cap then return cap else v
 
 class BlockSetter
     constructor: (@tick, @player) ->
-        @blockSet = new frp.EventStream
+        blockSet = {ref:null} #new frp.EventStream
 
         @MAXPOWER = 1000
-        @BLOCKCOST = 50
+        @BLOCKCOST = 200
         @MINPOWER = 0
 
-
-        setFull = new frp.EventStream
-        full = frp.hold false, setFull
-
-        refill = @tick.gate (full.not())
-        refill = refill.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
+        refill = @tick.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
 
         effects = [
                 refill
-                @blockSet.constMap ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
+                frp.constMap blockSet, ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
         ]
 
         @blockpower = frp.accum 0, (frp.mergeAll effects)
         @canSetBlock = @blockpower.map ((v) => v > @BLOCKCOST)
-        isFull = @blockpower.map ((v) => v >= @MAXPOWER)
-        isFull.updates().onTrue(->setFull.send true)
-        @blockSet.onTrue(->setFull.send false)
+        #full.ref = @blockpower.map ((v) => v >= @MAXPOWER)
 
         doSetBlock = @player.setBlockEvent.gate @canSetBlock
-        doSetBlock.listen ((v) => @blockSet.send true)
+
+        blockSet.ref = doSetBlock.constMap true
+        @blockSet = blockSet.ref
+
+        @blockSet.listen (log "blockSet")
+        @canSetBlock.updates().listen (log "canSet")
 
 class Jumping
     constructor: (@tick, @player) ->
@@ -560,13 +571,13 @@ class Jumping
         @JUMPFORCE = 300
         @MAX_JUMPS = 3
 
-
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
                 (@player.jumpEvent.constMap inc)
                 (@player.landedOnBlock.constMap (constant 0))
         ])
 
-        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS - 1)
+
+        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
 
