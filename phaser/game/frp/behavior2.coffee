@@ -1,20 +1,16 @@
 #frp = require '../frp/behavior.js'
 frp = require '../frp/frp.js'
+tick = frp.tick
+preTick = frp.preTick
 
-inc = (x) -> (x + 1)
-dec = (x) -> (x - 1)
+log = frp.log
 
-tick = new frp.EventStream
-# a tick for phaser systems that need to be executed at first (e.g. collision)
-preTick = new frp.EventStream
+player = require '../frp/player_behaviors.js'
+StopMoveEvent = player.StopMoveEvent
+MoveEvent = player.MoveEvent
+Direction = player.Direction
 
-# returns an event that triggers once after 'initial' milliseconds
-mkCountdown = (initial) ->
-    counter = frp.accum initial, (tick.map ((v) -> ((a) -> a - v)))
-    finished = counter.updates().filter ((v) -> v < 0)
-    return (finished.constMap true).once()
-
-class Movement
+shaders = require '../frp/shaders.js'
 
 # combine events and their effects
 manyConstEffects = (initial, effects) ->
@@ -32,18 +28,6 @@ onEventDo = (e, initial, callback) ->
    event = frp.switchE behaviorEvent # event (a)
    return event
 
-# return a function returning a constant
-constant = (x) -> ((a) -> x)
-
-log = (t) -> ((v) -> console.log t, v)
-
-class StopMoveEvent
-    constructor: ->
-        @dir = new Direction 0, 0
-class MoveEvent
-    constructor: (x, y) ->
-        @dir = new Direction x, y
-
 class DefaultBlock
     constructor: ->
         @texture = 'redboxblock'
@@ -53,7 +37,7 @@ class DefaultBlock
 class TempBlock
     constructor: () ->
         @touchEvent = (new frp.EventStream()).once() # multiple sends would reset the countdown
-        countdownFinishedEvent = onEventDo @touchEvent, frp.never, ((v) -> mkCountdown 500)
+        countdownFinishedEvent = onEventDo @touchEvent, frp.never, ((v) -> frp.mkCountdown 500)
         @removeMeEvent = countdownFinishedEvent.once().constMap true
         @texture = 'redboxblock'
 
@@ -159,21 +143,21 @@ class Parallax
 class Camera
     constructor: (@tick, @game, world) ->
         @game.camera.bounds = null
-
-        # world.players[0].position.updates().listen ((pos) =>
-        #     distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
-        #     distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
-        #     if (Math.abs distance) > 200
-        #          if (distance > 0)
-        #             @game.camera.x = @game.camera.x + (-distance + 200)
-        #          else if distance < 0
-        #             @game.camera.x = @game.camera.x + (-distance - 200)
-        #     if (Math.abs distance_y) > 200
-        #         if distance > 0
-        #             @game.camera.y += (-distance_y - 200)
-        #         else if distance < 0
-        #             @game.camera.y += (-distance_y + 200)
-        #     )
+        
+        world.players[0].position.updates().listen ((pos) =>
+            distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
+            distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
+            if (Math.abs distance) > 200
+                 if (distance > 0)
+                    @game.camera.x = @game.camera.x + (-distance + 200)
+                 else if distance < 0
+                    @game.camera.x = @game.camera.x + (-distance - 200)
+            if (Math.abs distance_y) > 200
+                if distance_y < 0
+                    @game.camera.y += (-distance_y - 200)
+                else if distance_y > 0
+                    @game.camera.y += (-distance_y + 200)
+            )
 
         @shakeIt()
 
@@ -189,7 +173,7 @@ class Camera
         effects = [
             reset.constMap (new frp.Behavior 0)
             @shakeMe.map ((v) =>
-                timer = (mkCountdown 300)
+                timer = (frp.mkCountdown 300)
                 counter = frp.accum 10, (@tick.map ((t) -> (a) -> a - t/10.0))
                 rotation = counter.map ((v) -> (Math.sin v) / 16) # frp.hold 0 (@tick.map ((t) -> Math.sin t)) #frp.accum 0 effects
                 timer.listen ((_) -> reset.send true)
@@ -203,7 +187,7 @@ class Camera
 class World
     constructor: (game) ->
         @players = [
-            new Player game, "p1"
+            new player.Player game, "p1"
             #new Player game, "p2"
             #new Player game, "p3"
         ]
@@ -216,7 +200,7 @@ class World
         @trees_high = game.add.sprite 0, 500, 'trees_high'
         @trees_high.blendMode = PIXI.blendModes.ADD
 
-        @trees_high.shader = new IntensityFilter 0
+        @trees_high.shader = new shaders.IntensityFilter 0
 
         tick.listen ((t) =>
             width = @trees_high.texture.width
@@ -231,7 +215,6 @@ class World
 
         for player in @players
             setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
-                console.log "set block"
                 gridsize = 25;
                 x = Math.floor(pos.x / gridsize)
                 y = Math.floor(pos.y / gridsize + 1)
@@ -250,47 +233,6 @@ class World
 
     save: ->
     reload: ->
-
-class TestFilter extends PIXI.AbstractFilter
-    constructor: (r, g, b) ->
-        PIXI.AbstractFilter.call this
-        this.uniforms =
-            color:
-                type: '3f'
-                value: {x:r/255.0, y:g/255.0, z:b/255.0}
-        @fragmentSrc = [
-            'precision mediump float;'
-            'uniform vec3 color;'
-            'void main () {'
-            '   gl_FragColor = vec4(color, 1);'
-            '}'
-        ] 
-
-class IntensityFilter extends PIXI.AbstractFilter
-    constructor: (intensity) ->
-        PIXI.AbstractFilter.call this
-        this.uniforms =
-            intensity:
-                type: '1f'
-                value: intensity
-            relPos:
-                type: '2f'
-                value: {x:0, y:0}
-        @fragmentSrc = [
-                'precision mediump float;'
-                'varying vec2 vTextureCoord;'
-                'varying vec4 vColor;'
-                'uniform sampler2D uSampler;'
-                'uniform vec2 relPos;'
-                'uniform float intensity;'
-                'void main(void) {'
-                '    float angle = atan(relPos.y, relPos.x);'
-                '    vec4 color = texture2D(uSampler, vTextureCoord);' 
-                '    float sprAngle = (color.r)*3.14;'
-                '    float newIntensity = abs(angle - sprAngle)/3.14;'
-                '    gl_FragColor = vec4(1, 1, 0.8, color.a*newIntensity);'
-                '}'
-            ]
 
 class ParticleGroup
     constructor: (game) ->
@@ -325,222 +267,10 @@ class ParticleGroup
             innerGlow.scale.set 2, 2
             outerGlow.scale.set 4, 4
 
-            innerGlow.shader = new TestFilter 77, 233, 57
-            outerGlow.shader = new TestFilter 200, 233, 57
+            innerGlow.shader = new shaders.TestFilter 77, 233, 57
+            outerGlow.shader = new shaders.TestFilter 200, 233, 57
             @group.add outerGlow
             @group.add innerGlow
-
-class Player
-    constructor: (game, @name="p") ->
-        @moveEvent = new frp.EventStream
-        @jumpEvent = new frp.EventStream
-        @setBlockEvent = new frp.EventStream
-
-        # from phaser
-        @landedOnBlock = new frp.EventStream
-
-        startMovement = new Movement tick, this
-
-        [@setMovementSystem, @movement] = selector (startMovement.value), {
-            'BaseMovement': (tick, _this) ->
-                    movement = new Movement tick, _this
-                    return movement.value
-            'OtherMovement': (tick, _this) ->
-                    movement = new Movement2 tick, _this
-                    return movement.value
-        }, tick, this
-        @jumping = new Jumping tick, this
-        @blockSetter = new BlockSetter tick, this
-
-        # position only to test discrepancies between phaser coordinates and behavior coordinates
-        setPosition = new frp.EventStream
-
-        int = tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)
-    
-        effects = [
-            setPosition.map ((pos) -> (oldPos) -> pos)
-            int.map ((dPos) -> (pos) ->
-                    new Direction (pos.x + dPos), (pos.y))
-        ]
-
-        @position = frp.accum (new Direction 0, 0), (frp.mergeAll effects)
-        @setPosition = (x, y) -> setPosition.send x, y
-
-        @sprite = game.add.sprite 100, 200, 'runner'
-        #@sprite.shader = new TestFilter 200, 0, 0
-        game.physics.enable @sprite, Phaser.Physics.ARCADE
-        @sprite.body.collideWorldBounds = true
-        @sprite.body.setSize 7, 28, 3, 0
-        @sprite.body.gravity.y = 1050
-        @sprite.allowGravity = true
-
-        @jumping.value.listen ((vy) =>
-            @sprite.body.velocity.y -= vy)
-
-        t = tick.onTickDo (@movement), ((speed) => @sprite.body.velocity.x = speed.vx)
-        t.listen ((v) ->)
-
-# TODO splats for arbitary number of arguments
-selector = (initial, choices, arg1, arg2) ->
-    setter = new frp.EventStream()
-    choice = setter.map ((e) -> choices[e](arg1, arg2)) # Event (Behavior)
-
-    # frp.hold initial, choice # Behavior (Behavior)
-    selected = frp.switchBeh (frp.hold initial, choice) # Behavior
-    return [setter, selected]
-
-class Speed
-    constructor: (@vx, @vy) ->
-
-    copy: () =>
-        new Speed(@vx, @vy)
-
-    @null: -> new Speed 0, 0
-
-class Direction
-    constructor: (x, y) ->
-        ## TODO: normalize
-        @x = x
-        @y = y
-
-    copy: () =>
-        new Direction(@x, @y)
-
-    times: (vector) ->
-        c = @copy()
-        c.x *= vector.vx
-        c.y *= vector.vy
-        return new Speed c.x, c.y
-
-    @null: -> new Direction 0, 0
-
-second = (a, b) -> b
-
-# event that represents the value of the behavior on tick
-tick.onTick = (beh) => tick.snapshot beh, second
-preTick.onTick = (beh) => preTick.snapshot beh, second
-tick.onTickDo = (beh, callback) => tick.snapshot beh, ((t, behValue) -> callback behValue)
-preTick.onTickDo = (beh, callback) => preTick.snapshot beh, ((t, behValue) -> callback behValue)
-
-class Movement2
-    constructor: (@tick, @player) ->
-        @MAXSPEED = 1000
-        @BASESPEED = 200
-
-        @isMoving = frp.hold false, (@player.moveEvent.map ((e) ->
-                if e instanceof StopMoveEvent then false else true))
-        @movingDirection = frp.hold Direction.null(), (@player.moveEvent.map ((e) -> e.dir))
-
-        startedMoving = @isMoving.updates().filter ((v) -> v == true)
-        stoppedMoving = @isMoving.updates().filter ((v) -> v == false)
-
-        effects = [
-            [startedMoving, (oldBehavior) =>
-                    frp.accum @BASESPEED, @tick.map ((t) => ((speed) => upperCap (t/4.0 + speed), @MAXSPEED))]
-        ]
-
-        # speed = frp.switchBeh (manyConstEffects (new frp.Behavior 0), effects)
-        # @speed = speed.map ((speed) -> new Speed speed, 0)
-        # @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed))
-        @value = pure (new Speed 0, 0)
-
-class Movement
-    constructor: (@tick, @player) ->
-        @MAXSPEED = new Speed 300, 0
-        @BASESPEED = new Speed 300, 0
-
-        startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
-
-        @setVelocity = new frp.EventStream()
-        modVelocity = {ref:null}
-    
-        velEffects = frp.mergeAll [
-            @setVelocity
-            frp.mapE modVelocity, ((v) -> (a) -> v)
-        ]
-
-        baseVelocity = frp.accum 0, velEffects
-        velocity = baseVelocity.map ((v) -> upperCap v, 300)
-        @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
-
-        modVelocity.ref = frp.execute (startMove.constMap ((_) =>
-            stopMove = @player.moveEvent.filter ((e) ->
-               return e instanceof StopMoveEvent)
-            stopMoveOccured = frp.hold false, (stopMove.constMap true).once()
-            timer = (mkCountdown 200).gate (stopMoveOccured.not())
-
-            initialAccel = frp.accum 200, (tick.map ((t) -> (a) -> lowerCap (a - t), 0))
-            accel = initialAccel.values().map ((a) -> (old) -> a + old)
-            accel = accel.gate (stopMoveOccured.not())
-
-            effects = [
-                accel
-                stopMove.constMap ((a) -> 0)
-            ]
-        
-            velocity = frp.updates (frp.accum 0, (frp.mergeAll effects))
-    
-            return velocity
-            ))
-        modVelocity.ref = frp.switchE (frp.hold frp.never, modVelocity.ref)
-        modVelocity.ref.listen (log "vel")
-
-        v2 = velocity.map ((x) -> return (new Speed x, 0))
-        v2 = frp.apply v2, @direction, ((v, dir) -> dir.times v)
-        @value = v2 #(@movingDirection.map ((dir) => dir.times @BASESPEED))
-
-lowerCap = (v, cap) -> if v < cap then return cap else v
-upperCap = (v, cap) -> if v > cap then return cap else v
-
-class BlockSetter
-    constructor: (@tick, @player) ->
-        blockSet = {ref:null} #new frp.EventStream
-
-        @MAXPOWER = 1000
-        @BLOCKCOST = 200
-        @MINPOWER = 0
-
-        refill = @tick.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
-
-        effects = [
-                refill
-                frp.constMap blockSet, ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
-        ]
-
-        @blockpower = frp.accum 0, (frp.mergeAll effects)
-        @canSetBlock = @blockpower.map ((v) => v > @BLOCKCOST)
-        #full.ref = @blockpower.map ((v) => v >= @MAXPOWER)
-
-        doSetBlock = @player.setBlockEvent.gate @canSetBlock
-
-        blockSet.ref = doSetBlock.constMap true
-        @blockSet = blockSet.ref
-
-        @blockSet.listen (log "blockSet")
-        @canSetBlock.updates().listen (log "canSet")
-
-class Jumping
-    constructor: (@tick, @player) ->
-        jumpResets = frp.mergeAll [
-            @player.landedOnBlock
-        ]
-
-        jumpStarters = frp.mergeAll [
-            @player.jumpEvent
-        ]
-
-        @JUMPFORCE = 300
-        @MAX_JUMPS = 3
-
-        @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
-                (@player.jumpEvent.constMap inc)
-                (@player.landedOnBlock.constMap (constant 0))
-        ])
-
-
-        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
-
-        @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
 
 module.exports.World = World
 module.exports.MoveEvent = MoveEvent

@@ -5,6 +5,8 @@ var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
 var b = require('../frp/behavior2.js');
 
+var tick = frp.tick
+
 function TestState() {}
 
 TestState.prototype = {
@@ -185,7 +187,8 @@ TestState.prototype = {
           this.game.state.start("menu");
       }
       var end = new Date().getTime();
-      console.log ("dt", end - start);
+      if (end - start > 10)
+        console.warn ("dt", end - start);
   }
 };
 

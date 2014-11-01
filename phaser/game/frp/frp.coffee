@@ -709,6 +709,40 @@ testTickEvery = ->
         )
     return null
 
+inc = (x) -> (x + 1)
+dec = (x) -> (x - 1)
+
+tick = EventStream.new()
+# a tick for phaser systems that need to be executed at first (e.g. collision)
+preTick = EventStream.new()
+
+# event that represents the value of the behavior on tick
+tick.onTick = (beh) => tick.snapshot beh, second
+preTick.onTick = (beh) => preTick.snapshot beh, second
+tick.onTickDo = (beh, callback) => tick.snapshot beh, ((t, behValue) -> callback behValue)
+preTick.onTickDo = (beh, callback) => preTick.snapshot beh, ((t, behValue) -> callback behValue)
+
+# returns an event that triggers once after 'initial' milliseconds
+mkCountdown = (initial) ->
+    counter = accum initial, (tick.map ((v) -> ((a) -> a - v)))
+    finished = counter.updates().filter ((v) -> v < 0)
+    return (finished.constMap true).once()
+
+second = (a, b) -> b
+
+# TODO splats for arbitary number of arguments
+selector = (initial, choices, arg1, arg2) ->
+    setter = EventStream.new()
+    choice = setter.map ((e) -> choices[e](arg1, arg2)) # Event (Behavior)
+
+    # frp.hold initial, choice # Behavior (Behavior)
+    selected = switchB (hold initial, choice) # Behavior
+    return [setter, selected]
+
+
+# return a function returning a constant
+constantFunc = (x) -> ((a) -> x)
+
 module.exports = 
     EventStream:-> EventStream.new()
     Behavior: (initA) ->
@@ -732,3 +766,11 @@ module.exports =
     mapE:mapE
     sync: (f) ->
         system.sync f
+    tick:tick
+    preTick:preTick
+    selector:selector
+    inc:inc
+    dec:dec
+    constantFunc:constantFunc
+    log:log
+    mkCountdown:mkCountdown
