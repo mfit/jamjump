@@ -44,6 +44,9 @@ TestState.prototype = {
         }
         this.game.rootGroup.add(this.frpWorld.particles.group);
         this.game.rootGroup.add(this.frpWorld.trees);
+        for (var i = 0; i < this.frpWorld.players.length; i++) {
+            this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
+        }
 
 
         // Set 1 color bg
@@ -62,8 +65,8 @@ TestState.prototype = {
   render: function () {
   },
   update: function () {
+      var start = new Date().getTime();
       //this.wb.update();
-      console.log ("TICK")
       var that = this;
 
       var keyboard = this.game.input.keyboard;
@@ -109,12 +112,23 @@ TestState.prototype = {
       }
 
       if (this.moving !== -1 && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
+          if (this.moving !== 0) {
+            playerEvents.push (function() {
+                that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
+                });
+          }
           playerEvents.push (function() {
               that.frpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
               });
+
               this.moving = -1;
       }
       if (this.moving !== 1 && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
+          if (this.moving !== 0) {
+            playerEvents.push (function() {
+                that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
+                });
+          }
           playerEvents.push (function() {
             that.frpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
             });
@@ -170,6 +184,8 @@ TestState.prototype = {
       if (this.game.input.keyboard.isDown(Phaser.Keyboard.ESC)) {
           this.game.state.start("menu");
       }
+      var end = new Date().getTime();
+      console.log ("dt", end - start);
   }
 };
 
