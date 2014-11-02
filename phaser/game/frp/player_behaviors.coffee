@@ -108,7 +108,7 @@ class CollisionBox
         @setPos.snapshotEffect @offset, (([x, y], offset) =>
             @sprite.body.x = x + offset
             @sprite.body.y = y
-        ) 
+        )
 
         @sprite = game.add.sprite 100, 200, 'pixel'
         @sprite.scale.set 10, 10

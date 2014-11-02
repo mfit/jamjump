@@ -120,6 +120,11 @@ module.exports = function (grunt) {
       build: {
         src: ['game/main.js'],
         dest: 'dist/js/game.js'
+      },
+      options: {
+        browserifyOptions: {
+            debug: true
+        }
       }
     }
   });
