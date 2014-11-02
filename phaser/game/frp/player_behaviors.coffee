@@ -83,16 +83,25 @@ class CollisionBox
         # on start push event fires for 1000ms
         canStart = {ref:null}
         reallyStartPush = @startPush.gate canStart
-        
-        pushs = frp.onEventMakeBehaviors [0, true], reallyStartPush, ((_) ->
-            time = frp.tickFor 1000
-            end = (frp.tickAfter 1000).once()
-            end.listen (log "End")
+        reallyStartPush = reallyStartPush.constMap tick
+
+        pushs = frp.onEventMakeBehaviors [0, true], reallyStartPush, ((tick) ->
+            time = frp.tickFor tick, 1000
+            time2 = frp.tickAfter tick, 1000
+            time2 = frp.tickFor time2, 1000
+            end = (frp.tickAfter tick, 2000).once()
+
             b = frp.hold false, (end.constMap true)
-            b.updates().listen (log "but")
 
             goRight = frp.integrate (time.times 2), 0, (frp.pure 100)
-            final = frp.switchB (frp.hold goRight, end.constMap (frp.pure 0))
+            goLeft = frp.integrate (time2.times 2), 200, (frp.pure (-100))
+
+            effects = [
+                time2.constMap goLeft
+                end.constMap (frp.pure 0)
+            ]
+            final = frp.hold goRight, (frp.mergeAll effects)
+            final = frp.switchB final
             return [
                 final
                 b
@@ -101,12 +110,10 @@ class CollisionBox
         canStart.ref = pushs.at 1
         @offset = pushs.at 0
         #@offset.updates().listen (log "Offset")
-        reallyStartPush.listen (log "reallyCanStart")
-        canStart.ref.updates().listen (log "canStart")
-
 
         @setPos.snapshotEffect @offset, (([x, y], offset) =>
             @sprite.body.x = x + offset
+
             @sprite.body.y = y
         )
 
@@ -165,41 +172,34 @@ class Movement
         @BASESPEED = new Speed 300, 0
 
         startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
+        stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
         @setVelocity = new frp.EventStream()
         modVelocity = {ref:null}
     
         velEffects = frp.mergeAll [
             @setVelocity
-            frp.mapE modVelocity, ((v) -> (a) -> v)
+            modVelocity
         ]
 
         baseVelocity = frp.accum 0, velEffects
         velocity = baseVelocity.map ((v) -> upperCap v, 300)
         @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
 
-        modVelocity.ref = frp.execute (startMove.constMap ((_) =>
-            stopMove = @player.moveEvent.filter ((e) ->
-               return e instanceof StopMoveEvent)
-            stopMoveOccured = frp.hold false, (stopMove.constMap true).once()
-            timer = (frp.mkCountdown 200).gate (stopMoveOccured.not())
-
+        modVelocity.ref = frp.onEventMakeEvent startMove, ((_) =>
+            #stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
+            stopMoveOccured = frp.happened stopMove
             localTick = tick.gate (stopMoveOccured.not())
 
-            initialAccel = frp.accum 200, (localTick.map ((t) -> (a) -> lowerCap (a - t), 0))
-            accel = initialAccel.values().map ((a) -> (old) -> a + old)
-            accel = accel.gate (stopMoveOccured.not())
+            velocity = frp.integrate localTick, 200, (frp.pure (-16))
+            velocity = velocity.map ((a) -> (old) -> a + old)
 
             effects = [
-                accel
-                stopMove.constMap ((a) -> 0)
+                velocity.updates()
+                stopMove.constMap (frp.constant 0)
             ]
-        
-            velocity = frp.updates (frp.accum 0, (frp.mergeAll effects))
-    
-            return velocity
-            ))
-        modVelocity.ref = frp.switchE (frp.hold frp.never, modVelocity.ref)
+            return frp.mergeAll effects
+            )
 
         v2 = velocity.map ((x) -> return (new Speed x, 0))
         v2 = frp.apply v2, @direction, ((v, dir) -> dir.times v)

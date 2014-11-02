@@ -158,12 +158,12 @@ class Unlistener
     constructor: (@unlisten) ->
 
 class Listen
-    constructor: (@callback) ->
+    constructor: (@callback, @keepAlive) ->
         @takeDowns = []
     destroy: () ->
-        for takeDown in @takeDowns
+        #for takeDown in @takeDowns
             #console.log "Takedown", takeDown
-            takeDown()
+            #takeDown()
 
 class Observer
     constructor: ->
@@ -333,6 +333,7 @@ applicative = (bf_, bb_) ->
     e1 = updates bf_
     e2 = updates bb_
 
+
     gl = ->
         fRef = bf_.sample.unSample()
         aRef = bb_.sample.unSample()
@@ -353,6 +354,7 @@ applicative = (bf_, bb_) ->
             )
         addCleanup_Listen unlistener, l
 
+    keepAliveRef = {ref:null}
     s = new Sample (->
         if bf_.hasOwnProperty 'ref'
             bf_ = bf_.ref
@@ -360,11 +362,12 @@ applicative = (bf_, bb_) ->
             bb_ = bb_.ref
         s1 = bf_.sample.unSample
         s2 = bb_.sample.unSample
+        keepAliveRef.ref = bb_.sample
 
         f = s1()
         a = s2()
         return f(a)
-        ), ([bf_.sample.dep, bb_.sample.dep]), null
+        ), ([bf_.sample.dep, bb_.sample.dep]), keepAliveRef
     e = new EventStream gl, null, [e1, e2]
     return new Behavior e, s
 
@@ -466,7 +469,8 @@ updates = (beh) ->
             beh.ref.updates_}
     else
         return beh.updates_
-
+class KeepAlive
+    constructor: ->
 hold = (initA, ea) ->
     bs = new BehaviorState initA, new Nothing()
     unlistener = later (->
@@ -482,7 +486,8 @@ hold = (initA, ea) ->
             bs.update = new Just a
             )
     )
-    sample = addCleanup_Sample unlistener, (new Sample (-> bs.current), ea, null)
+    keepAliveRef = new KeepAlive()
+    sample = addCleanup_Sample unlistener, (new Sample (-> bs.current), ea, keepAliveRef)
 
     b = new Behavior ea, sample
     if initA.hasOwnProperty 'type'
@@ -753,13 +758,14 @@ selector = (initial, choices, arg1, arg2) ->
 constant= (x) -> ((a) -> x)
 
 # an tick that ticks for t milliseconds
-tickFor = (t) ->
-    timeTicking = accum [0, 0], (tick.map ((t) -> ([a, _]) -> [a + t, t]))
+tickFor = (baseTick, t) ->
+    timeTicking = accum [0, 0], (baseTick.map ((t) -> ([a, _]) -> [a + t, t]))
     v = (updates timeTicking).filter (([tick, _]) -> tick < t)
     return v.at 1
 
-tickAfter = (t) ->
-    timeTicking = accum [0, 0], (tick.map ((t) -> ([a, _]) -> [a + t, t]))
+tickAfter = (baseTick, t) ->
+    t2 = baseTick.map ((t) -> ([a, _]) -> [a + t, t])
+    timeTicking = accum [0, 0], t2
     v = (updates timeTicking).filter (([tick, _]) -> tick > t)
     return v.at 1
 
@@ -802,6 +808,8 @@ integrate = (dt, x, dx) ->
     diff = dt.snapshot dx, ((dt, dx) -> (oldX) -> oldX + dt * dx / 1000.0)
     return accum x, diff
 
+happened = (e) -> (hold false, e.once().constMap true)
+
 module.exports = 
     EventStream:-> EventStream.new()
     Behavior: (initA) ->
@@ -840,3 +848,4 @@ module.exports =
     onEventMakeBehavior:onEventMakeBehavior
     integrate:integrate
     onEventMakeBehaviors:onEventMakeBehaviors 
+    happened:happened
