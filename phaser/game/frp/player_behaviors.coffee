@@ -7,12 +7,12 @@ preTick = frp.preTick
 
 class Player
     constructor: (game, @name="p") ->
-        @moveEvent = new frp.EventStream
-        @jumpEvent = new frp.EventStream
-        @setBlockEvent = new frp.EventStream
+        @moveEvent = new frp.EventStream "MoveEvent"
+        @jumpEvent = new frp.EventStream "JumpEvent"
+        @setBlockEvent = new frp.EventStream "SetBlockEvent"
 
         # from phaser
-        @landedOnBlock = new frp.EventStream
+        @landedOnBlock = new frp.EventStream "LandedOnBlock"
 
         startMovement = new Movement tick, this
 
@@ -28,7 +28,7 @@ class Player
         @blockSetter = new BlockSetter tick, this
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
-        setPosition = new frp.EventStream
+        setPosition = new frp.EventStream "SetPosition"
 
         int = tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)
     
@@ -74,11 +74,11 @@ class Player
 
 class CollisionBox
     constructor: (game, @owner,
-            @setActive=new frp.EventStream(),
-            @addColliders=new frp.EventStream()) ->
-        @setPos = new frp.EventStream()
+            @setActive=new frp.EventStream("SetActive"),
+            @addColliders=new frp.EventStream ("addColliders")) ->
+        @setPos = new frp.EventStream "SetCollisionBoxPos"
 
-        @startPush = new frp.EventStream()
+        @startPush = new frp.EventStream "StartPush"
 
         # on start push event fires for 1000ms
         canStart = {ref:null}
@@ -97,7 +97,7 @@ class CollisionBox
             goLeft = frp.integrate (time2.times 2), 200, (frp.pure (-100))
 
             effects = [
-                time2.constMap goLeft
+                time2.once().constMap goLeft
                 end.constMap (frp.pure 0)
             ]
             final = frp.hold goRight, (frp.mergeAll effects)
@@ -165,16 +165,22 @@ class Movement2
         # @speed = speed.map ((speed) -> new Speed speed, 0)
         # @value = (@movingDirection.apply @speed, ((dir, speed) -> dir.times speed))
         @value = pure (new Speed 0, 0)
-
+numObjects = (o) ->
+    sum = 0
+    for x of o
+        sum += 1
+    return sum
 class Movement
     constructor: (@tick, @player) ->
         @MAXSPEED = new Speed 300, 0
         @BASESPEED = new Speed 300, 0
 
+        @player.moveEvent.name = [@player.moveEvent.name, "moveEvent"]
         startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
         stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
+        stopMove.name = [stopMove.name, "stopMove"]
 
-        @setVelocity = new frp.EventStream()
+        @setVelocity = new frp.EventStream "SetVelocity"
         modVelocity = {ref:null}
     
         velEffects = frp.mergeAll [
@@ -186,13 +192,16 @@ class Movement
         velocity = baseVelocity.map ((v) -> upperCap v, 300)
         @direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
 
-        modVelocity.ref = frp.onEventMakeEvent startMove, ((_) =>
-            #stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
-            stopMoveOccured = frp.happened stopMove
-            localTick = tick.gate (stopMoveOccured.not())
+        startMove = startMove.constMap tick
+        modVelocity.ref = frp.onEventMakeEvent startMove, ((tick) =>
+            localTick = frp.tickUntilEvent tick, stopMove.once()
 
-            velocity = frp.integrate localTick, 200, (frp.pure (-16))
-            velocity = velocity.map ((a) -> (old) -> a + old)
+            accel = frp.integrate localTick, 1000, (frp.pure (-100))
+            accel = accel.map ((a) -> lowerCap a, 0)
+            velocity = frp.integrate localTick, 0, accel
+            velocity = velocity.map ((a) -> (old) -> a)
+
+            console.log (numObjects tick.cacheRef.obs.listeners)
 
             effects = [
                 velocity.updates()
