@@ -3,6 +3,7 @@ shaders = require '../frp/shaders.js'
 
 log = frp.log
 tick = frp.tick
+preTick = frp.preTick
 
 class Player
     constructor: (game, @name="p") ->
@@ -41,6 +42,7 @@ class Player
         @setPosition = (x, y) -> setPosition.send x, y
 
         @sprite = game.add.sprite 100, 200, 'runner'
+        @sprite.behavior = this
         #@sprite.shader = new TestFilter 200, 0, 0
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = true
@@ -55,26 +57,85 @@ class Player
         @pushBox = new CollisionBox game, this, (last.ref.updates())
         follow this, @pushBox
 
-        @jumping.value.listen ((vy) =>
-            @sprite.body.velocity.y -= vy)
+        preTick.snapshotEffect @movement, ((_, m) =>
+            @pushBox.setPos.send [@sprite.body.x, @sprite.body.y]
+            )
 
-        t = tick.snapshotMany [@movement, @pushBox.position], ((t, speed, boxSpeed) =>
+        @jumping.value.listen ((vy) =>
+            @sprite.body.velocity.y -= vy
+            #@pushBox.sprite.body.velocity.y -= vy0ebb
+            )
+
+        t = tick.snapshotMany [@movement, @pushBox.movement], ((t, speed, boxSpeed) =>
             @sprite.body.velocity.x = speed.vx
-            @pushBox.sprite.body.x = boxSpeed.x
-            @pushBox.sprite.body.y = boxSpeed.y
+            #@pushBox.sprite.body.velocity.x = speed.vx
             )
         t.listen ((v) ->)
 
 class CollisionBox
-    constructor: (game, @owner, @setActive) ->
+    constructor: (game, @owner,
+            @setActive=new frp.EventStream(),
+            @addColliders=new frp.EventStream()) ->
+        @setPos = new frp.EventStream()
+
+        @startPush = new frp.EventStream()
+
+        # on start push event fires for 1000ms
+        canStart = {ref:null}
+        reallyStartPush = @startPush.gate canStart
+        
+        pushs = frp.onEventMakeBehaviors [0, true], reallyStartPush, ((_) ->
+            time = frp.tickFor 1000
+            end = (frp.tickAfter 1000).once()
+            end.listen (log "End")
+            b = frp.hold false, (end.constMap true)
+            b.updates().listen (log "but")
+
+            goRight = frp.integrate (time.times 2), 0, (frp.pure 100)
+            final = frp.switchB (frp.hold goRight, end.constMap (frp.pure 0))
+            return [
+                final
+                b
+                ]
+            )
+        canStart.ref = pushs.at 1
+        @offset = pushs.at 0
+        #@offset.updates().listen (log "Offset")
+        reallyStartPush.listen (log "reallyCanStart")
+        canStart.ref.updates().listen (log "canStart")
+
+
+        @setPos.snapshotEffect @offset, (([x, y], offset) =>
+            @sprite.body.x = x + offset
+            @sprite.body.y = y
+        ) 
+
         @sprite = game.add.sprite 100, 200, 'pixel'
         @sprite.scale.set 10, 10
         @sprite.shader = new shaders.TestFilter 0, 0, 0
         game.physics.enable @sprite, Phaser.Physics.ARCADE
         @sprite.body.collideWorldBounds = false
+        #@sprite.body.setSize 7, 28, 3, 0
+        @sprite.body.gravity.y = 1050
+        @sprite.allowGravity = true
 
         @active = frp.hold false, @setActive
-        @active.updates().listen ((active) => @sprite.shader.uniforms.color.value.x = active)
+        @active.updates().listen ((active) =>
+            @sprite.shader.uniforms.color.value.x = active
+            )
+
+        @collidesWith = frp.accum [], (@addColliders.map ((c) -> (cs) ->
+            cs.push c
+            return cs
+            ))
+
+        doCollision = preTick.gate @active
+        doCollision.snapshotEffect @collidesWith, ((_, colliders) =>
+            for collider in colliders
+                game.physics.arcade.collide collider.sprite, @sprite, (sprite, otherSprite) =>
+                    if otherSprite.hasOwnProperty 'touchEvent'
+                        otherSprite.touchEvent.send sprite
+            )
 
 class Movement2
     constructor: (@tick, @player) ->
@@ -186,7 +247,7 @@ class Jumping
 
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
                 (@player.jumpEvent.constMap frp.inc)
-                (@player.landedOnBlock.constMap (frp.constantFunc 0))
+                (@player.landedOnBlock.constMap (frp.constant 0))
         ])
 
 
@@ -195,7 +256,7 @@ class Jumping
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
 
 follow = (@base, @follower) ->
-    @follower.position = @base.position
+    @follower.movement = @base.movement
 
 class Speed
     constructor: (@vx, @vy) ->

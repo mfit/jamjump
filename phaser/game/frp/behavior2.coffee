@@ -188,9 +188,12 @@ class World
     constructor: (game) ->
         @players = [
             new player.Player game, "p1"
-            #new Player game, "p2"
-            #new Player game, "p3"
+            new player.Player game, "p2"
+            new player.Player game, "p3"
         ]
+
+        @players[0].pushBox.addColliders.send (@players[1])
+    
         @worldBlocks = BlockManager.mkBehaviors game
         @camera = new Camera tick, game, this
         @particles = new ParticleGroup game
@@ -238,7 +241,7 @@ class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();
 
-        for i in [0..50]
+        for i in [0..0]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
 

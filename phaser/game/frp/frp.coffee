@@ -85,6 +85,11 @@ class EventStream
     gate: (b) -> gate this, b
     once: () -> once this
     at: (index) -> mapE this, ((vs) -> vs[index])
+    snapshotEffect: (beh, callback) ->
+        e = @snapshot beh, callback
+        e.listen ((v) ->)
+
+    times: (a) -> @map ((v) -> v * a)
 
     mkUpdateEvent: ->
         e1 = mapE this, ((v) -> [v]) 
@@ -106,7 +111,8 @@ finalizeSample = (s, unlisten) ->
 
 addCleanup_Listen = (unlistener, listen) ->
     finalizeListen listen, (->
-        unlistener.unlisten()
+        if unlistener.unlisten
+            unlistener.unlisten()
         unlistener.unlisten = null
     )
 
@@ -136,6 +142,7 @@ class Behavior
     updates: () -> updates this
     value: () -> @sample.unSample()
     values: () -> values this
+    at: (index) -> mapB this, ((vs) -> vs[index])
 
 class Just
     constructor: (@value) ->
@@ -316,7 +323,9 @@ filterJust = (ea) ->
     return (new EventStream gl, null, ea)
 
 gate = (ea, b) ->
-    e = snapshot ea, b, ((a, b) -> if b then new Just a else new Nothing())
+    e = snapshot ea, b, ((a, b) ->
+        if b then new Just a else new Nothing()
+        )
     return filterJust e
 
 apply = (ba, bb, f) -> applicative (ba.map ((a) -> (b) -> f a, b)), bb
@@ -445,7 +454,7 @@ execute = (ev) ->
     return new EventStream gl, null, ev
 
 never = new EventStream (->new Listen (->), null), null, null
-constant = (a) -> new Behavior never, (new Sample (->a))
+constantB = (a) -> new Behavior never, (new Sample (->a))
 values = (ba) ->
     sa = ba.sample
     ea = updates ba
@@ -671,7 +680,7 @@ eventSender = EventStream.new()
 behaviorSender = EventStream.new()
 never = EventStream.new()
 
-pure = (a) -> constant a
+pure = (a) -> constantB a
 
 tick = EventStream.new()
 sendBeh = EventStream.new()
@@ -741,7 +750,57 @@ selector = (initial, choices, arg1, arg2) ->
 
 
 # return a function returning a constant
-constantFunc = (x) -> ((a) -> x)
+constant= (x) -> ((a) -> x)
+
+# an tick that ticks for t milliseconds
+tickFor = (t) ->
+    timeTicking = accum [0, 0], (tick.map ((t) -> ([a, _]) -> [a + t, t]))
+    v = (updates timeTicking).filter (([tick, _]) -> tick < t)
+    return v.at 1
+
+tickAfter = (t) ->
+    timeTicking = accum [0, 0], (tick.map ((t) -> ([a, _]) -> [a + t, t]))
+    v = (updates timeTicking).filter (([tick, _]) -> tick > t)
+    return v.at 1
+
+# create event on event
+# returns an event
+onEventMakeEvent = (e, callback) ->
+    v = hold never, (execute (e.map ((v) -> -> callback v)))
+    return switchE v
+
+onEventMakeBehavior = (initial, e, callback) ->
+    v = hold (pure initial), execute e.map ((v) -> -> callback v)
+    return switchB v
+
+collectBehs = (behs) ->
+    new_behs = []
+    for beh in behs
+        new_behs.push (beh.map ((a) -> [a]))
+
+    first_b = new_behs[0]
+    new_behs.shift()
+    for new_beh in new_behs
+        first_b = apply first_b, new_beh, ((b1, b2) ->
+            bnew = []
+            for b1_ in b1
+                bnew.push b1_
+            for b2_ in b2
+                bnew.push b2_
+            return bnew
+            )
+    return first_b
+
+onEventMakeBehaviors = (initials, e, callback) ->
+    v = hold (pure initials), execute e.map ((v) -> ->
+        behs = callback v
+        return collectBehs behs
+        )
+    return switchB v   
+
+integrate = (dt, x, dx) ->
+    diff = dt.snapshot dx, ((dt, dx) -> (oldX) -> oldX + dt * dx / 1000.0)
+    return accum x, diff
 
 module.exports = 
     EventStream:-> EventStream.new()
@@ -755,6 +814,7 @@ module.exports =
     hold:hold
     apply:apply
     switchBeh:switchB
+    switchB:switchB
     updates:updates
     values:values
     switchE:switchE
@@ -771,6 +831,12 @@ module.exports =
     selector:selector
     inc:inc
     dec:dec
-    constantFunc:constantFunc
+    constant:constant
     log:log
     mkCountdown:mkCountdown
+    tickFor:tickFor
+    tickAfter:tickAfter
+    onEventMakeEvent:onEventMakeEvent
+    onEventMakeBehavior:onEventMakeBehavior
+    integrate:integrate
+    onEventMakeBehaviors:onEventMakeBehaviors 

@@ -3,6 +3,7 @@
 var Tiled = require('../model/tiled.js');
 var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
+var player = require('../frp/player_behaviors.js');
 var b = require('../frp/behavior2.js');
 
 var tick = frp.tick
@@ -14,6 +15,7 @@ TestState.prototype = {
         this.game.map = this.game.tiled_loader.create(this.game.add);
         this.map = this.game.map;
         Tiled.LoadTiledAtlas(this.game, this.map);
+        this.game.time.advancedTiming = true
   },
   create: function () {
         //var e = Tiled.MakeObjectLayerSprites(this.game, this.map, 'Object Layer 1');
@@ -65,6 +67,7 @@ TestState.prototype = {
       return -1;
   },
   render: function () {
+      this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
   },
   update: function () {
       var start = new Date().getTime();
@@ -165,8 +168,11 @@ TestState.prototype = {
 
       if (keyboard.isDown(Phaser.Keyboard.F)) {
           playerEvents.push (function() {
-              that.frpWorld.camera.shakeMe.send(true);
+              that.frpPlayer.pushBox.startPush.send (true)
               });
+          // playerEvents.push (function() {
+          //     that.frpWorld.camera.shakeMe.send(true);
+          //     });
       }
 
       // update stuff
