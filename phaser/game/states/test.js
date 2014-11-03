@@ -56,11 +56,11 @@ TestState.prototype = {
         this.game.rootGroup.add(this.frpWorld.worldBlocks.value().block_group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].sprite);
-            this.game.rootGroup.add(this.frpWorld.players[i].dbg);
         }
         this.game.rootGroup.add(this.frpWorld.particles.group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
+            this.game.rootGroup.add(this.frpWorld.players[i].dbg);
         }
 
 

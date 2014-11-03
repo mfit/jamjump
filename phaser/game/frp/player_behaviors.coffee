@@ -15,13 +15,13 @@ class Player
         game.physics.enable @sprite, Phaser.Physics.ARCADE, true
         @sprite.body.collideWorldBounds = true
         if spriteKey == 'runner1'
-            @sprite.body.setSize 14, 78, 10, 2
+            @sprite.body.setSize 14, 78, 23, 2
         else
-            @sprite.body.setSize 14, 56, 10, 10
+            @sprite.body.setSize 14, 56, 23, 10
 
         @dbg = game.add.sprite (100 + 10), (200 + 10), 'pixel'
         @dbg.scale.set 14, 56
-        @dbg.shader = new shaders.TestFilter 1, 0, 0, 1
+        @dbg.shader = new shaders.TestFilter 1, 0, 0
 
         
         @moveEvent = new frp.EventStream "MoveEvent"
@@ -233,6 +233,21 @@ class WalkAnimation
         anim.ref = frp.accum (new WalkAnimation player), (frp.mergeAll effects)
         return anim.ref
 
+class Dash
+    @mkBehavior: (tick, startDash, lookingDirection) ->
+        endDash = frp.onEventMakeEvent startDash, ((_) ->
+            return (frp.tickEvery tick, 200).once()
+            )
+
+        dashing = frp.hold false, (frp.mergeAll [
+            startDash.constMap true
+            endDash.constMap false
+            ])
+
+        dashMod = (tick.gate dashing).snapshot lookingDirection, ((dt, dir) -> (v) -> Vector.add v, (new Vector (dir*1500), 0))
+        dashMod.dashing = dashing
+        return dashMod
+
 class Movement
     constructor: (@tick, @player) ->
         @MAXSPEED = new Speed 300, 0
@@ -242,17 +257,24 @@ class Movement
         stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
         direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
+        direction.updates().listen ((dir) =>
+            @player.sprite.scale.set (-dir.x), 1
+            )
 
         walkAnim = WalkAnimation.mkBehavior @player, @tick, startMove, stopMove
         walkAnim.updates().listen (log "test")
 
         modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
             localTick = frp.tickUntilEvent @tick, stopMove.once()
-            accel = frp.integrate localTick, 100, (frp.pure (5000))
-            accel = accel.map ((a) -> lowerCap a, 0)
-            accel = accel.map ((a) -> new Vector (direction.dir.x*a), 0)
-            velocity = frp.integrate localTick, (new Vector (direction.dir.x*0), 0), accel, Vector.add, Vector.scalar
-            velocity = velocity.map ((a) -> (old) -> Vector.add old, a)
+            # accel = frp.integrate localTick, 100, (frp.pure (5000))
+            # accel = accel.map ((a) -> lowerCap a, 0)
+            # accel = accel.map ((a) -> new Vector (direction.dir.x*a), 0)
+            #velocity = frp.integrate localTick, (new Vector (direction.dir.x*0), 0), accel, Vector.add, Vector.scalar
+            #velocity = velocity.map ((a) -> (old) -> Vector.add old, a)
+
+            v = 100 * direction.dir.x
+            velocity = frp.hold ((old) -> Vector.add old, (new Vector v, 0)),
+                localTick.constMap ((old) -> Vector.add old, (new Vector v, 0))
             return velocity.updates()
             )
 
@@ -277,6 +299,13 @@ class Movement
         value = bc.velocity
 
 
+        sndPress = frp.onEventMakeBehavior false, startMove, ((_) ->
+            return frp.hold true, ((frp.tickEvery tick, 100).once().constMap false)
+            )
+        startDash = startMove.gate sndPress
+        dash = Dash.mkBehavior @tick, startDash, (direction.map ((dir) -> dir.x))
+
+
         standing = frp.onEventMakeBehavior false, @player.landedOnBlock, ((_) =>
             end = frp.timer preTick, 64
             return frp.hold true, (end.constMap false)
@@ -295,23 +324,24 @@ class Movement
 
         mods = frp.merge resetVel, jump
     
-        gravity = new Force @tick, frp.never, 1050, 1050
-        gravVel = new Velocity @tick, mods, 1050, gravity
+        gravTick = @tick.gate (dash.dashing.not())
+        
+        gravity = new Force gravTick, frp.never, 1050, 1050
+        gravVel = new Velocity gravTick, mods, 1050, gravity
         fallV = frp.hold (Vector.null()), (gravVel.updates().map ((v) -> new Vector 0, v))
 
-        wallJumpGrav = new Velocity @tick, (frp.merge wallJump2, resetVel), 1050, gravity
+        wallJumpGrav = new Velocity gravTick, (frp.merge wallJump2, resetVel), 1050, gravity
         wallJumpFrac = new Velocity @tick, wallJump1, 1050, null, (frp.pure 0.9)
         wallJump = frp.hold (Vector.null()), (frp.mergeAll [
             wallJumpGrav.updates().map ((v) -> new Vector 0, v)
             wallJumpFrac.updates().map ((v) -> new Vector v, 0)
             ])
-
-
         @value = frp.accum (Vector.null()), (frp.mergeAll [
             preTick.constMap (frp.constant (Vector.null()))
             value.updates().map ((v) -> (old) -> Vector.add old, v)
             fallV.updates().map ((v) -> (old) -> Vector.add old, v)
             wallJump.updates().map ((v) -> (old) -> Vector.add old, v)
+            dash
             ])
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
