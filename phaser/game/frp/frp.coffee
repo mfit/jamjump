@@ -438,7 +438,7 @@ applicative = (bf_, bb_) ->
 mapB = (b_, f) ->
     fe = mapE (updates b_), f
     if b_.hasOwnProperty 'ref'
-        fs = new Sample (-> f(b_.ref.sample.unSample())), b_.ref.sample.dep, null
+        fs = new Sample (-> f(b_.ref.sample.unSample())), b_, null
     else
         s = b_.sample.unSample
         fs = new Sample (->f(s())), b_.sample.dep, null
@@ -1048,6 +1048,14 @@ tickAfterEvent = (baseTick, event) ->
     occurred = happened event
     return baseTick.gate occurred
 
+# tickEvery = (baseTick, time) ->
+#     reset = {ref:null}
+#     ticker = accum 0, (mergeAll [
+#         (baseTick.map ((t) -> (a) -> a + t))
+#         constMap reset, ((a) -> a - time)
+#         ])
+#     reset.ref = fr
+
 # create event on event
 # returns an event
 onEventMakeEvent = (e, callback) ->
@@ -1152,3 +1160,6 @@ module.exports =
     second:second
     snapshot:snapshot
     timer:timer
+    tickEvery:tickEvery
+    mapE:mapE
+    mapB:mapB

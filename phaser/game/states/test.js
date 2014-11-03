@@ -50,14 +50,15 @@ TestState.prototype = {
         this.game.rootGroup.add(background3);
         this.game.rootGroup.add(background2);
         this.game.rootGroup.add(background1);
+        this.game.rootGroup.add(this.frpWorld.trees);
         console.log ("World", this.frpWorld.worldBlocks.value())
         this.game.rootGroup.add(this.frpWorld.worldBlocks.value().coll_group);
         this.game.rootGroup.add(this.frpWorld.worldBlocks.value().block_group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].sprite);
+            this.game.rootGroup.add(this.frpWorld.players[i].dbg);
         }
         this.game.rootGroup.add(this.frpWorld.particles.group);
-        this.game.rootGroup.add(this.frpWorld.trees);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
         }
@@ -223,7 +224,7 @@ TestState.prototype = {
       this.playerEvents = []
 
       frp.sync(function() {b.tick.send(that.game.time.elapsed)});
-      
+
       frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
 
       //

@@ -6,7 +6,24 @@ preTick = frp.preTick
 postTick = frp.postTick
 
 class Player
-    constructor: (game, @tick, @name="p") ->
+    constructor: (game, @tick, @name="p", spriteKey="runner1") ->
+        @sprite = game.add.sprite 100, 200, spriteKey
+        @sprite.animations.add 'walk'
+        @sprite.behavior = this
+        @sprite.scale.set -1, 1
+        #@sprite.shader = new TestFilter 200, 0, 0
+        game.physics.enable @sprite, Phaser.Physics.ARCADE, true
+        @sprite.body.collideWorldBounds = true
+        if spriteKey == 'runner1'
+            @sprite.body.setSize 14, 78, 10, 2
+        else
+            @sprite.body.setSize 14, 56, 10, 10
+
+        @dbg = game.add.sprite (100 + 10), (200 + 10), 'pixel'
+        @dbg.scale.set 14, 56
+        @dbg.shader = new shaders.TestFilter 1, 0, 0, 1
+
+        
         @moveEvent = new frp.EventStream "MoveEvent"
         @jumpEvent = new frp.EventStream "JumpEvent"
         @setBlockEvent = new frp.EventStream "SetBlockEvent"
@@ -39,12 +56,11 @@ class Player
         @position = frp.accum (new Direction 0, 0), (frp.mergeAll effects)
         @setPosition = (x, y) -> setPosition.send x, y
 
-        @sprite = game.add.sprite 100, 200, 'runner'
-        @sprite.behavior = this
-        #@sprite.shader = new TestFilter 200, 0, 0
-        game.physics.enable @sprite, Phaser.Physics.ARCADE, true
-        @sprite.body.collideWorldBounds = true
-        @sprite.body.setSize 14, 56, 6, 0
+
+        @position.updates().listen ((pos) =>
+            @dbg.x = pos.x
+            @dbg.y = pos.y
+            )
         #@sprite.body.gravity.y = 1050
         #@sprite.allowGravity = true
 
@@ -153,6 +169,70 @@ numObjects = (o) ->
         sum += 1
     return sum
 
+class WalkAnimation
+    constructor: (@player) ->
+        frames = @player.sprite.animations.totalFrames
+        @player.sprite.animations.loop = true
+        @running = false
+        @advance = false
+
+        @msPerFrame = 50
+        @leftover = 0
+
+    tick: (dt) ->
+        if @leftover + dt > @msPerFrame
+            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 3)
+                @player.sprite.animations.frame = 4
+                @running = false
+                @leftover = 0
+                return
+
+            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 7)
+                @player.sprite.animations.frame = 0
+                @running = false
+                @leftover = 0
+                return
+
+            if @player.sprite.animations.currentFrame.index == 7
+                @player.sprite.animations.frame = 0
+            else
+                @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
+            @leftover = @leftover - @msPerFrame
+
+        @leftover += dt
+
+    startRun: () ->
+        @advance = true
+        @running = true
+
+    stopRun: () ->
+        @advance = false
+
+    isRunning: -> @running
+
+    @mkBehavior: (player, tick, startMove, stopMove) ->
+        anim = {ref:null}
+        r = frp.mapB anim, ((anim) -> anim.isRunning())
+        tickWhenRunning = tick.gate r
+        tickWhenRunning.listen (log "tickwalk")
+        effects = [
+            startMove.constMap ((anim) ->
+                anim.startRun()
+                return anim
+                )
+            stopMove.constMap ((anim) ->
+                anim.stopRun()
+                return anim
+                )
+            tickWhenRunning.map ((dt) -> (anim) ->
+                console.log dt, anim
+                anim.tick dt
+                return anim
+                )
+        ]
+        anim.ref = frp.accum (new WalkAnimation player), (frp.mergeAll effects)
+        return anim.ref
+
 class Movement
     constructor: (@tick, @player) ->
         @MAXSPEED = new Speed 300, 0
@@ -162,6 +242,9 @@ class Movement
         stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
         direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
+
+        walkAnim = WalkAnimation.mkBehavior @player, @tick, startMove, stopMove
+        walkAnim.updates().listen (log "test")
 
         modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
             localTick = frp.tickUntilEvent @tick, stopMove.once()
@@ -192,6 +275,7 @@ class Movement
             )
         bc = new BaseComponents @tick, 300, null, (frp.merge modVelocity1, modVelocity2)
         value = bc.velocity
+
 
         standing = frp.onEventMakeBehavior false, @player.landedOnBlock, ((_) =>
             end = frp.timer preTick, 64

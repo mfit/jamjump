@@ -108,11 +108,12 @@ class BlockManager
 
         coords = @toWorldCoords x, y
 
+        console.log block.gid
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
 
         block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
-                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
+                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", 2
 
         if neighbors.bottom != null
             if neighbors.bottom.hasOwnProperty 'main'
@@ -239,8 +240,8 @@ class World
     
         playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
-            new player.Player game, playerTick, "p1"
-        #    new player.Player game, playerTick, "p2"
+            new player.Player game, playerTick, "p1", 'runner1'
+            new player.Player game, playerTick, "p2", 'runner2'
          #   new player.Player game, "p3"
         ]
 
