@@ -4,7 +4,7 @@ var Tiled = require('../model/tiled.js');
 var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
 var player = require('../frp/player_behaviors.js');
-var b = require('../frp/behavior2.js');
+var b = require('../frp/world_behaviors.js');
 
 var tick = frp.tick
 
@@ -21,6 +21,15 @@ TestState.prototype = {
         //var e = Tiled.MakeObjectLayerSprites(this.game, this.map, 'Object Layer 1');
         //console.log(e);
         this.moveEvent = new frp.EventStream();
+        this.game.world.scale.set (1, 1)
+        this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.NO_SCALE;
+        this.game.scale.startFullScreen(false);
+        // this.game.input.onDown.add(function () {
+        //     if (this.game.scale.isFullScreen)
+        //         this.game.scale.stopFullScreen();
+        //     else
+        //         this.game.scale.startFullScreen(false);
+        //     }, this);
 
         var that = this;
         this.frpWorld = frp.sync(function () {return new b.World(that.game); });
@@ -42,6 +51,7 @@ TestState.prototype = {
         this.game.rootGroup.add(background2);
         this.game.rootGroup.add(background1);
         console.log ("World", this.frpWorld.worldBlocks.value())
+        this.game.rootGroup.add(this.frpWorld.worldBlocks.value().coll_group);
         this.game.rootGroup.add(this.frpWorld.worldBlocks.value().block_group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].sprite);
@@ -62,12 +72,30 @@ TestState.prototype = {
         this.eDown = false;
         this.currentPlayer = 0;
         this.jDown = false;
+      
+      
+        var keyboard = this.game.input.keyboard;
+        var x = keyboard.addKey(Phaser.Keyboard.X)
+        var y = keyboard.addKey(Phaser.Keyboard.Y)
+        x.onDown.add (function () {         
+            var that = this;
+            this.playerEvents.push (function () {
+                that.frpWorld.makeFaster.send(true)
+            })}, this);
+        y.onDown.add (function () {         
+            var that = this;
+            this.playerEvents.push (function () {
+                that.frpWorld.makeSlower.send(true)
+            })}, this);
+     
+      this.playerEvents = [];
   },
   getId: function() {
       return -1;
   },
   render: function () {
       this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
+      this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
   },
   update: function () {
       var start = new Date().getTime();
@@ -119,6 +147,7 @@ TestState.prototype = {
       if (this.moving !== -1 && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
           if (this.moving !== 0) {
             playerEvents.push (function() {
+                console.log ("Send stop move")
                 that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
                 });
           }
@@ -131,6 +160,7 @@ TestState.prototype = {
       if (this.moving !== 1 && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
           if (this.moving !== 0) {
             playerEvents.push (function() {
+                console.log ("Send stop move")
                 that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
                 });
           }
@@ -157,6 +187,7 @@ TestState.prototype = {
           this.qDown = false;
       }
 
+
       if (this.eDown === false && keyboard.isDown(Phaser.Keyboard.E)) {
           playerEvents.push (function() {
               that.frpPlayer.setMovementSystem.send('OtherMovement')
@@ -168,11 +199,14 @@ TestState.prototype = {
 
       if (keyboard.isDown(Phaser.Keyboard.F)) {
           playerEvents.push (function() {
+              that.frpWorld.camera.shakeMe.send (true)
+              });
+      }
+
+      if (keyboard.isDown(Phaser.Keyboard.G)) {
+          playerEvents.push (function() {
               that.frpPlayer.pushBox.startPush.send (true)
               });
-          // playerEvents.push (function() {
-          //     that.frpWorld.camera.shakeMe.send(true);
-          //     });
       }
 
       // update stuff
@@ -182,9 +216,15 @@ TestState.prototype = {
       for (var index in playerEvents) {
           frp.sync(playerEvents[index]);
       }
+      for (var index in this.playerEvents) {
+          frp.sync(this.playerEvents[index]);
+      }
       playerEvents = []
+      this.playerEvents = []
 
       frp.sync(function() {b.tick.send(that.game.time.elapsed)});
+      
+      frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
 
       //
       // Test for pause key

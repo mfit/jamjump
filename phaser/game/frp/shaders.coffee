@@ -1,20 +1,43 @@
 class TestFilter extends PIXI.AbstractFilter
-    constructor: (r, g, b) ->
+    constructor: (r, g, b, a=1) ->
+        PIXI.AbstractFilter.call this
+        this.uniforms =
+            color:
+                type: '4f'
+                value: {x:r/255.0, y:g/255.0, z:b/255.0, w:a}
+        @fragmentSrc = [
+            'precision mediump float;'
+            'uniform vec4 color;'
+            'void main () {'
+            '   gl_FragColor = color;'
+            '}'
+        ] 
+
+class ColorFilter extends PIXI.AbstractFilter
+    constructor: (color) ->
         PIXI.AbstractFilter.call this
         this.uniforms =
             color:
                 type: '3f'
-                value: {x:r/255.0, y:g/255.0, z:b/255.0}
+                value: color
         @fragmentSrc = [
-            'precision mediump float;'
-            'uniform vec3 color;'
-            'void main () {'
-            '   gl_FragColor = vec4(color, 1);'
-            '}'
-        ] 
+                'precision mediump float;'
+                'varying vec2 vTextureCoord;'
+                'varying vec4 vColor;'
+                'uniform sampler2D uSampler;'
+                'uniform vec3 color;'
+                'void main(void) {'
+                '    vec4 texColor = texture2D(uSampler, vTextureCoord);' 
+                '    texColor.r *= color.r;'
+                '    texColor.g *= color.g;'
+                '    texColor.b *= color.b;'
+                '    gl_FragColor = vec4(texColor);'
+                '}'
+            ]
+
 
 class IntensityFilter extends PIXI.AbstractFilter
-    constructor: (intensity) ->
+    constructor: (intensity, color) ->
         PIXI.AbstractFilter.call this
         this.uniforms =
             intensity:
@@ -23,6 +46,9 @@ class IntensityFilter extends PIXI.AbstractFilter
             relPos:
                 type: '2f'
                 value: {x:0, y:0}
+            color:
+                type: '3f'
+                value: color
         @fragmentSrc = [
                 'precision mediump float;'
                 'varying vec2 vTextureCoord;'
@@ -30,15 +56,17 @@ class IntensityFilter extends PIXI.AbstractFilter
                 'uniform sampler2D uSampler;'
                 'uniform vec2 relPos;'
                 'uniform float intensity;'
+                'uniform vec3 color;'
                 'void main(void) {'
                 '    float angle = atan(relPos.y, relPos.x);'
-                '    vec4 color = texture2D(uSampler, vTextureCoord);' 
-                '    float sprAngle = (color.r)*3.14;'
+                '    vec4 texColor = texture2D(uSampler, vTextureCoord);' 
+                '    float sprAngle = (texColor.r)*3.14;'
                 '    float newIntensity = abs(angle - sprAngle)/3.14;'
-                '    gl_FragColor = vec4(1, 1, 0.8, color.a*newIntensity);'
+                '    gl_FragColor = vec4(color, texColor.a*newIntensity);'
                 '}'
             ]
 
 module.exports =
     TestFilter:TestFilter
     IntensityFilter:IntensityFilter
+    ColorFilter:ColorFilter

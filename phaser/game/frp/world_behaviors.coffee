@@ -2,6 +2,7 @@
 frp = require '../frp/frp.js'
 tick = frp.tick
 preTick = frp.preTick
+postTick = frp.postTick
 
 log = frp.log
 
@@ -68,7 +69,14 @@ class BlockManager
         @block_group.allowGravity = false;
         @block_group.immovable = true;
 
-        @blockSize = 25
+        @coll_group = game.add.group()
+        @coll_group.enableBody = true;
+        @coll_group.allowGravity = false;
+        @coll_group.immovable = true;
+
+        #@block_group.add @coll_group
+
+        @blockSize = 50
 
     toWorldCoords: (x, y) ->
         return {x:x*@blockSize, y:y*@blockSize}
@@ -89,6 +97,12 @@ class BlockManager
         if !@blocks.hasOwnProperty y
             @blocks[y] = {}
         @blocks[y][x] = block
+        neighbors =
+            left: if @blocks[y].hasOwnProperty (x-1) then @blocks[y][x-1] else null
+            right: if @blocks[y].hasOwnProperty (x+1) then @blocks[y][x+1] else null
+            top: if (@blocks.hasOwnProperty (y-1)) and @blocks[y-1].hasOwnProperty (x) then @blocks[y-1][x] else null
+            bottom: if (@blocks.hasOwnProperty (y+1)) and @blocks[y+1].hasOwnProperty x then @blocks[y+1][x] else null
+
         block.x = x
         block.y = y
 
@@ -99,11 +113,44 @@ class BlockManager
 
         block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
                 (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
-        block.sprite = @block_group.add block.sprite
+
+        if neighbors.bottom != null
+            if neighbors.bottom.hasOwnProperty 'main'
+                neighbors.bottom = neighbors.bottom.main
+            block.sprite = @block_group.add block.sprite
         #block.sprite.loadTexture block.texture, 1
-        block.sprite.body.immovable = true
-        block.sprite.body.setSize 25, 25, 12, 12
-        block.sprite.block = block
+            h = neighbors.bottom.sprite.body.height
+            offset_y = neighbors.bottom.sprite.body.offset.y
+            neighbors.bottom.sprite.body.setSize 50, (h + 50), 24, (offset_y - 50)
+            block.main = neighbors.bottom
+        else if neighbors.top != null
+            if neighbors.top.hasOwnProperty 'main'
+                neighbors.top = neighbors.top.main
+
+            block.sprite = @block_group.add block.sprite
+        #block.sprite.loadTexture block.texture, 1
+            h = neighbors.top.sprite.body.height
+            offset_y = neighbors.top.sprite.body.offset.y
+            neighbors.top.sprite.body.setSize 50, (h + 50), 24, offset_y
+            #neighbors.bottom.dbg.y -= 25
+            #neighbors.top.dbg.scale.set 25, (h + 25)
+            block.main = neighbors.top
+        else
+            block.sprite = @coll_group.add block.sprite
+            w = 50
+            h = 50
+            xoff = 24
+            yoff = 24
+            #@game.physics.enable block.sprite, Phaser.Physics.ARCADE
+            block.sprite.body.setSize w, h, xoff, yoff
+            block.sprite.body.immovable = true
+            block.sprite.block = block
+
+            #dbg_block = @game.add.sprite (block.sprite.body.x + xoff), (block.sprite.body.y + yoff), "pixel"
+            #dbg_block.scale.set w, h
+            #dbg_block.shader = new shaders.TestFilter 255, 0, 0
+            #block.dbg = dbg_block
+            #@block_group.add dbg_block
 
     removeBlock: (x, y) ->
         if @blocks.hasOwnProperty(y) and @blocks[y].hasOwnProperty x
@@ -164,11 +211,6 @@ class Camera
     shakeIt: ->
         @shakeMe = new frp.EventStream
 
-        # effects = [
-        #     @tick.map ((t) -> (a) ->
-        # ]
-
-
         reset = new frp.EventStream
         effects = [
             reset.constMap (new frp.Behavior 0)
@@ -186,39 +228,58 @@ class Camera
 
 class World
     constructor: (game) ->
+        @tick = tick
+
+        @makeFaster = new frp.EventStream()
+        @makeSlower = new frp.EventStream()
+        @mod = frp.accum 1, (frp.mergeAll [
+            @makeFaster.constMap ((m) -> m * 2)
+            @makeSlower.constMap ((m) -> m / 2)
+            ])
+    
+        playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
-            new player.Player game, "p1"
-            new player.Player game, "p2"
-            new player.Player game, "p3"
+            new player.Player game, playerTick, "p1"
+        #    new player.Player game, playerTick, "p2"
+         #   new player.Player game, "p3"
         ]
 
-        @players[0].pushBox.addColliders.send (@players[1])
+        #@players[0].pushBox.addColliders.send (@players[1])
     
         @worldBlocks = BlockManager.mkBehaviors game
         @camera = new Camera tick, game, this
         @particles = new ParticleGroup game
 
         @trees = game.add.group();
-        trees = game.add.sprite 0, 500, 'trees'
+        @tree = game.add.sprite 0, 500, 'trees'
+        @tree.shader = new shaders.ColorFilter {x:1, y:1, z:1}
+        #@tree.blendMode = PIXI.blendModes.ADD
         @trees_high = game.add.sprite 0, 500, 'trees_high'
         @trees_high.blendMode = PIXI.blendModes.ADD
 
-        @trees_high.shader = new shaders.IntensityFilter 0
+        @trees_high.shader = new shaders.IntensityFilter 0, {x:1, y:1, z:0.8}
 
         tick.listen ((t) =>
             width = @trees_high.texture.width
             height = @trees_high.texture.height
             @trees_high.shader.uniforms.relPos.value.x = game.input.x - width/2.0 + game.camera.x;
             @trees_high.shader.uniforms.relPos.value.y = + 500 - game.input.y + height + game.camera.y
+            @trees_high.shader.uniforms.color.value.x = 0.8 + 0.2*(game.input.x - width/2.0 + game.camera.x) / width
+            @trees_high.shader.uniforms.color.value.y = (0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
+            @trees_high.shader.uniforms.color.value.z = 0.2*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
+            #@trees_high.shader.uniforms.color.value.y = 0.5 + (game.input.x - width/2.0 + game.camera.x) / width
             @trees_high.shader.dirty = true
+            @tree.shader.uniforms.color.value.y = 0.9 + 0.1*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
+            @tree.shader.uniforms.color.value.z = 0.7 + 0.3*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
+            @tree.shader.dirty = true
             )
 
-        @trees.add trees
+        @trees.add @tree
         @trees.add @trees_high
 
         for player in @players
             setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
-                gridsize = 25;
+                gridsize = 50;
                 x = Math.floor(pos.x / gridsize)
                 y = Math.floor(pos.y / gridsize + 1)
                 @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
@@ -227,9 +288,17 @@ class World
             setting.listen ((v) -> )
 
             s = preTick.onTickDo @worldBlocks, (((player) => (blockManager) =>
-                 game.physics.arcade.collide blockManager.block_group, player.sprite, (sprite, group_sprite) =>
-                     group_sprite.block.touchEvent.send true
-                     player.landedOnBlock.send true
+                 game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
+                    if group_sprite.body.touching.up == true
+                        group_sprite.block.touchEvent.send true
+                    if sprite.body.touching.down == true
+                        player.landedOnBlock.send true
+
+                    if sprite.body.touching.left == true 
+                        player.touchedWall.send (-1)
+                    if sprite.body.touching.right == true
+                        player.touchedWall.send 1
+                        
                  ) player)
             # side effects
             s.listen ((v) ->)
@@ -241,7 +310,7 @@ class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();
 
-        for i in [0..0]
+        for i in [0..50]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
 
@@ -281,6 +350,7 @@ module.exports.StopMoveEvent = StopMoveEvent
 module.exports.Direction = Direction
 module.exports.tick = tick
 module.exports.preTick = preTick
+module.exports.postTick = postTick
 
 module.exports.DefaultBlock = DefaultBlock
 module.exports.WinBlock = WinBlock

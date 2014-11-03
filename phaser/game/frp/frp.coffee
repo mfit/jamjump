@@ -95,6 +95,7 @@ class EventStream
         @listenTrans handle
 
     filter: (f) -> filter this, f
+    filterTrue: () -> filterTrue this
     map: (f) -> mapE this, f
     constMap: (a) -> constMap this, a
     snapshot: (b, f) -> snapshot this, b, f
@@ -175,6 +176,8 @@ class Behavior
     value: () -> @sample.unSample()
     values: () -> values this
     at: (index) -> mapB this, ((vs) -> vs[index])
+    apply: (beh2, f) -> apply this, beh2, f
+    value: () -> @sample.unSample()
 
 class Just
     constructor: (@value) ->
@@ -195,7 +198,7 @@ class Listen
         @listeners = 0
     destroy: () ->
         if @listeners >= 2
-            console.log "Many listeners", this
+            debug "Many listeners", this
         if @listeners == 0
             for takeDown in @takeDowns
                 takeDown()
@@ -438,7 +441,7 @@ mapB = (b_, f) ->
         fs = new Sample (-> f(b_.ref.sample.unSample())), b_.ref.sample.dep, null
     else
         s = b_.sample.unSample
-        fs = new Sample (-> f(s())), b_.sample.dep, null
+        fs = new Sample (->f(s())), b_.sample.dep, null
 
     later (->
         if b_.hasOwnProperty 'ref'
@@ -485,6 +488,7 @@ mapE = (e_, f) ->
     newE.name = "mapE"
     return newE
 
+filterTrue = (ea) -> filter ea, ((v) -> v == true)
 filter = (ea, pred) ->
     e1 = mapE ea, (v) -> if pred v then new Just v else new Nothing()
     e1.name = [e1.name, "apply pred"]
@@ -499,7 +503,10 @@ mergeAll = (esa) ->
             unlists = []
             for ea in esa
                 if ea.hasOwnProperty 'ref'
-                    ea = ea.ref
+                    if typeof ea.ref == 'function'
+                        ea = ea.ref()
+                    else
+                        ea = ea.ref
                 debug "linking mergeAll #{newE.getName()} to #{ea.getName()}"
                 un = ea.linkedListen node, false, ((v) -> push v)
                 f = (ea, un) -> (->
@@ -595,6 +602,7 @@ updates = (beh) ->
         return {ref:->
             e = beh.ref.updates_
             e.name = [beh.ref.name, e.name, "updates of #{beh.ref.getName()}"]
+            return e
             }
     else
         e = beh.updates_
@@ -780,7 +788,6 @@ switchB = (bba) ->
 
     debug "linking switchB #{newB.getName()} to #{bba.getName()}"
     unlisten1 = listenValueRaw bba, node, false, ((ba) ->
-        console.log "doUnlisten2"
         doUnlisten2()
         depRef.ref = ba
         debug "linking switchB #{newB.getName()} to #{ba.getName()} for #{bba.getName()}"
@@ -918,7 +925,6 @@ accum = (z, efa) ->
     s = {ref:null}
     s.ref = hold z, (snapshot efa, s, ((f, v) -> f v))
     s.ref.name = [s.ref.name, "accum"]
-    #s.ref.updates_.getListen().listeners -= 1
     s.ref.isRecursive = true
     return s.ref
 
@@ -966,6 +972,8 @@ dec = (x) -> (x - 1)
 tick = EventStream.new("Tick")
 # a tick for phaser systems that need to be executed at first (e.g. collision)
 preTick = EventStream.new("PreTick")
+# after updating speed etc. used for updating phaser
+postTick = EventStream.new("PostTick")
 
 test = ->
     dt = mapE tick, ((v) -> v + 1)
@@ -1023,12 +1031,14 @@ tickAfter = (baseTick, t) ->
     v = (updates timeTicking).filter (([tick, _]) -> tick > t)
     return v.at 1
 
+timer = (baseTick, time) ->
+    timeTicking = accum 0, (baseTick.map ((t) -> (a) -> a + t))
+    e = (updates timeTicking).filter ((t) -> t > time)
+    return e.once()
+
 tickUntilEvent = (baseTick, event) ->
     occurred = happened event
-    occurred.name = [occurred.name, "occurred"]
-    e2 = baseTick.gate (occurred.not())
-    e2.name = [e2.name, "tickUntilEvent"]
-    return e2
+    return baseTick.gate (occurred.not())
 
 tickWhen = (baseTick, beh, pred) ->
     fulfilled = beh.map pred
@@ -1076,11 +1086,16 @@ onEventMakeBehaviors = (initials, e, callback) ->
     (e2).listen (log "EEEEEEEEEE")
     return switchB v   
 
-integrate = (dt, x, dx) ->
-    diff = dt.snapshot dx, ((dt, dx) -> (oldX) -> oldX + dt * dx / 1000.0)
+integrate = (dt, x, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
+    diff = dt.snapshot dx, ((dt, dx) -> (oldX) -> add oldX, (scalar (dt / 1000.0), dx))
     b = accum x, diff
     b.name = [b.name, "accum, integrate"]
     return b
+
+integrateB = (dt, bx, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
+    diff = dt.snapshot dx, ((dt, dx) -> scalar (dt / 1000.0), dx)
+    b = diff.snapshot bx, ((d, b) -> add d, b)
+    return hold 0, b
 
 happened = (e) ->
     h = e.once().constMap true
@@ -1115,6 +1130,7 @@ module.exports =
         system.sync f
     tick:tick
     preTick:preTick
+    postTick:postTick
     selector:selector
     inc:inc
     dec:dec
@@ -1128,5 +1144,11 @@ module.exports =
     onEventMakeEvent:onEventMakeEvent
     onEventMakeBehavior:onEventMakeBehavior
     integrate:integrate
+    integrateB:integrateB
     onEventMakeBehaviors:onEventMakeBehaviors 
     happened:happened
+    filter:filter
+    filterTrue:filterTrue
+    second:second
+    snapshot:snapshot
+    timer:timer

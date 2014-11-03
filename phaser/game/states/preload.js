@@ -41,8 +41,8 @@ Preload.prototype = {
     this.game.levelData[3] = this.load.getAsset('text', 'level3');
     this.game.levelData[4] = this.load.getAsset('text', 'level4');
 
-    this.load.spritesheet('runner', 'assets/m1.png', 14, 28, -1, 0, 0);
-    this.load.spritesheet('runner2', 'assets/m2.png', 14, 28, -1, 0, 0);
+    this.load.spritesheet('runner', 'assets/m1.png', 28, 56, -1, 0, 0);
+    this.load.spritesheet('runner2', 'assets/m2.png', 28, 56, -1, 0, 0);
     this.load.image('titlecharacter', 'assets/komischgucker_alpha.png');
 
     this.load.image('redboxblock', 'assets/Block1.png');
