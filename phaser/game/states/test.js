@@ -37,6 +37,7 @@ TestState.prototype = {
         this.game.world.height = 5000;
 
         this.frpPlayer = this.frpWorld.players[0];
+        this.otherFrpPlayer = this.frpWorld.players[1];
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
@@ -61,17 +62,22 @@ TestState.prototype = {
 
         // Set 1 color bg
       
-        this.r = 0;
-        this.g = 0;
-        this.b = 0;
+        this.r = 250;
+        this.g = 250;
+        this.b = 250;
       
         this.game.stage.backgroundColor = 0;
         this.moving = 0;
+        this.moving2 = 0;
+
         this.jumpDown = false;
+        this.jumpDown2 = false;
+
         this.blockSetDown = false;
         this.qDown = false;
         this.eDown = false;
         this.currentPlayer = 0;
+        this.otherCurrentPlayer = 1;
         this.jDown = false;
       
       
@@ -105,6 +111,7 @@ TestState.prototype = {
 
         var x = keyboard.addKey(Phaser.Keyboard.X)
         var y = keyboard.addKey(Phaser.Keyboard.Y)
+
         x.onDown.add (function () {         
             var that = this;
             this.playerEvents.push (function () {
@@ -115,7 +122,7 @@ TestState.prototype = {
             this.playerEvents.push (function () {
                 that.frpWorld.makeSlower.send(true)
             })}, this);
-     
+
       this.playerEvents = [];
   },
   getId: function() {
@@ -128,9 +135,9 @@ TestState.prototype = {
   },
   update: function () {
         this.game.stage.backgroundColor = 
-            (this.r / 16)*Math.pow(16, 5) + (this.r % 16)*Math.pow(16,4)
-            +(this.g / 16)*Math.pow(16, 3) + (this.g % 16)*Math.pow(16,2)
-            +(this.b / 16)*Math.pow(16, 1) + (this.b % 16)*Math.pow(16,0)
+            Math.floor(this.r / 16)*Math.pow(16, 5) + (this.r % 16)*Math.pow(16,4)
+            +Math.floor(this.g / 16)*Math.pow(16, 3) + (this.g % 16)*Math.pow(16,2)
+            +Math.floor(this.b / 16)*Math.pow(16, 1) + (this.b % 16)*Math.pow(16,0)
             ;
       var start = new Date().getTime();
       //this.wb.update();
@@ -140,10 +147,27 @@ TestState.prototype = {
       
       var playerEvents = []
 
-      if (this.jDown === false && keyboard.isDown(Phaser.Keyboard.J)) {
+      if (this.jDown === false && keyboard.isDown(Phaser.Keyboard.N)) {
           this.jDown = true;
           this.currentPlayer += 1;
+          this.otherCurrentPlayer += 1;
           this.frpPlayer = this.frpWorld.players[this.currentPlayer % this.frpWorld.players.length];
+          this.otherFrpPlayer = this.frpWorld.players[this.otherCurrentPlayer % this.frpWorld.players.length];
+
+             var that = this;
+             playerEvents.push (function() {
+                console.log ("Send stop move")
+                that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
+                });         
+             playerEvents.push (function() {
+                console.log ("Send stop move")
+                that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
+                 that.moving = false;
+                 that.moving2 = false;
+                 that.jumpDown = false;
+                 that.jumpDown2 = false;
+                });         
+
       }
       if (this.jDown === true && !keyboard.isDown(Phaser.Keyboard.J)) {
           this.jDown = false;
@@ -177,6 +201,21 @@ TestState.prototype = {
               that.frpPlayer.setBlockEvent.send(true);
               });
       }
+      if (!this.jumpDown2 && this.game.input.keyboard.isDown(Phaser.Keyboard.K)) {
+          playerEvents.push (function() {
+              that.otherFrpPlayer.jumpEvent.send(true);
+              });
+          this.jumpDown2 = true;
+      } else if (this.jumpDown2 && !keyboard.isDown(Phaser.Keyboard.K)) {
+          this.jumpDown2 = false;
+      }
+
+      if (this.game.input.keyboard.isDown(Phaser.Keyboard.J)) {
+          playerEvents.push (function() {
+              that.otherFrpPlayer.setBlockEvent.send(true);
+              });
+      }
+
 
       if (this.moving !== -1 && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
           if (this.moving !== 0) {
@@ -211,6 +250,40 @@ TestState.prototype = {
               that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
               });
       }
+      if (this.moving2 !== -1 && keyboard.isDown(Phaser.Keyboard.H) && !keyboard.isDown(Phaser.Keyboard.L)) {
+          if (this.moving2 !== 0) {
+            playerEvents.push (function() {
+                console.log ("Send stop move")
+                that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
+                });
+          }
+          playerEvents.push (function() {
+              that.otherFrpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
+              });
+
+              this.moving2 = -1;
+      }
+      if (this.moving2 !== 1 && !keyboard.isDown(Phaser.Keyboard.H) && keyboard.isDown(Phaser.Keyboard.L)) {
+          if (this.moving2 !== 0) {
+            playerEvents.push (function() {
+                console.log ("Send stop move")
+                that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
+                });
+          }
+          playerEvents.push (function() {
+            that.otherFrpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
+            });
+          this.moving2 = 1;
+      }
+
+      if (this.moving2 !== 0 && !(keyboard.isDown(Phaser.Keyboard.H) || keyboard.isDown(Phaser.Keyboard.L))) {
+          this.moving2 = 0;
+          playerEvents.push (function() {
+              console.log ("Send stop move")
+              that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
+              });
+      }
+
 
       if (this.qDown === false && keyboard.isDown(Phaser.Keyboard.Q)) {
           playerEvents.push (function() {

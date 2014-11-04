@@ -77,7 +77,7 @@ class BlockManager
         @coll_group.immovable = true;
         @coll_group.invisible = true;
 
-        @block_group = new render.BlockSpriteBatch @game
+        @block_group = game.add.group();#new render.BlockSpriteBatch @game
 
         #@block_group.add @coll_group
 
@@ -113,11 +113,9 @@ class BlockManager
 
         coords = @toWorldCoords x, y
 
-        console.log block.gid
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
 
-        console.log set.tileWidth
         block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
                 (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
         @block_group.addChild block.sprite
@@ -126,33 +124,33 @@ class BlockManager
             if neighbors.bottom.hasOwnProperty 'main'
                 neighbors.bottom = neighbors.bottom.main
         #block.sprite.loadTexture block.texture, 1
-            h = neighbors.bottom.sprite.body.height
-            offset_y = neighbors.bottom.sprite.body.offset.y
-            neighbors.bottom.sprite.body.setSize 50, (h + 50), 24, (offset_y - 50)
+            h = neighbors.bottom.sprite2.body.height
+            offset_y = neighbors.bottom.sprite2.body.offset.y
+            neighbors.bottom.sprite2.body.setSize 50, (h + 50), 24, (offset_y - 50)
             block.main = neighbors.bottom
         else if neighbors.top != null
             if neighbors.top.hasOwnProperty 'main'
                 neighbors.top = neighbors.top.main
 
         #block.sprite.loadTexture block.texture, 1
-            h = neighbors.top.sprite.body.height
-            offset_y = neighbors.top.sprite.body.offset.y
-            neighbors.top.sprite.body.setSize 50, (h + 50), 24, offset_y
+            h = neighbors.top.sprite2.body.height
+            offset_y = neighbors.top.sprite2.body.offset.y
+            neighbors.top.sprite2.body.setSize 50, (h + 50), 24, offset_y
             #neighbors.bottom.dbg.y -= 25
             #neighbors.top.dbg.scale.set 25, (h + 25)
             block.main = neighbors.top
         else
-            block.sprite = @game.add.sprite (coords.x + set.tileOffset.x),
-                (coords.y + set.tileOffset.y)
-            @coll_group.add block.sprite
+            block.sprite2 = @game.add.sprite (coords.x + set.tileOffset.x), (coords.y + set.tileOffset.y)
+            @coll_group.add block.sprite2
             w = 50
             h = 50
             xoff = 24
             yoff = 24
             #@game.physics.enable block.sprite, Phaser.Physics.ARCADE
-            block.sprite.body.setSize w, h, xoff, yoff
-            block.sprite.body.immovable = true
+            block.sprite2.body.setSize w, h, xoff, yoff
+            block.sprite2.body.immovable = true
             block.sprite.block = block
+            block.sprite2.block = block
 
             #dbg_block = @game.add.sprite (block.sprite.body.x + xoff), (block.sprite.body.y + yoff), "pixel"
             #dbg_block.scale.set w, h
@@ -252,6 +250,12 @@ class World
          #   new player.Player game, "p3"
         ]
 
+        @players[0].pushVel.ref = frp.pure (player.Vector.null());
+        @players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].jumpEvent
+
+        @players[0].pullVel.ref = new player.Pull @tick, @players[1], @players[0], @players[1].jumpEvent
+        @players[1].pullVel.ref = frp.pure (player.Vector.null());
+
         #@players[0].pushBox.addColliders.send (@players[1])
     
         @worldBlocks = BlockManager.mkBehaviors game
@@ -333,7 +337,7 @@ class ParticleGroup
 
         inners = []
         outers = []
-        for i in [0..1000]
+        for i in [0..100]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
             inners.push innerGlow

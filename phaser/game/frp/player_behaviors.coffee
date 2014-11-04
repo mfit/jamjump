@@ -7,7 +7,7 @@ postTick = frp.postTick
 
 class Player
     constructor: (game, @tick, @name="p", spriteKey="runner1") ->
-        @sprite = game.add.sprite 100, 200, spriteKey
+        @sprite = game.add.sprite 1000, 200, spriteKey
         @sprite.animations.add 'walk'
         @sprite.behavior = this
         @sprite.scale.set -1, 1
@@ -333,11 +333,17 @@ class Movement
             wallJumpGrav.updates().map ((v) -> new Vector 0, v)
             wallJumpFrac.updates().map ((v) -> new Vector v, 0)
             ])
+
+        @player.pushVel = {ref:null}
+        @player.pullVel = {ref:null}
+
         @value = frp.accum (Vector.null()), (frp.mergeAll [
             preTick.constMap (frp.constant (Vector.null()))
             value.updates().map ((v) -> (old) -> Vector.add old, v)
             fallV.updates().map ((v) -> (old) -> Vector.add old, v)
             wallJump.updates().map ((v) -> (old) -> Vector.add old, v)
+            frp.mapE (frp.updates @player.pushVel), ((v) -> (old) -> Vector.add old, v)
+            frp.mapE (frp.updates @player.pullVel), ((v) -> (old) -> Vector.add old, v)
             dash
             ])
 
@@ -412,7 +418,9 @@ class Vector
     @null: () -> new Vector 0, 0
     length: () -> Math.sqrt (@x*@x + @y*@y)
     @add = (v1, v2) -> new Vector (v1.x + v2.x), (v1.y + v2.y)
+    @diff = (v1, v2) -> new Vector (v1.x - v2.x), (v1.y - v2.y)
     @scalar = (t, v) -> new Vector (t*v.x), (t*v.y)
+    dir: -> return Vector.scalar (1/@length()), this
 
 class Force
     constructor: (@tick, modForce, initial, accelCap, x=0) ->
@@ -501,6 +509,56 @@ class BaseComponents
 
         @velocity = velocity.ref
 
+pullStrength = 3
+class Pull
+    constructor: (@tick, @player1, @player2, @startPush) ->
+        charge = frp.onEventMakeEvent @startPush, (_) =>
+            return (frp.tickEvery @tick, 500).once()
+
+        distanceOnCharge = charge.snapshotMany [@player1.position, @player2.position], (_, p1, p2) ->
+            return (Vector.diff p1, p2)
+
+        distance = frp.hold Vector.null(), distanceOnCharge
+        #direction = distance.map ((dist) -> dist.dir())
+
+        pushDuration = frp.onEventMakeEvent charge, => frp.tickFor @tick, 500
+        pushEnd = frp.onEventMakeEvent charge, => (frp.tickEvery @tick, 500).once()
+
+        pushVel = frp.hold 0, (frp.mergeAll [
+            pushDuration.snapshot distance, ((_, dist) -> Vector.scalar (pullStrength*dist.length()), (dist.dir()))
+            pushEnd.constMap (Vector.null())
+            ])
+
+        distance.updates().listen (log "Distance")
+        pushDuration.listen (log "push duration")
+        pushEnd.listen (log "Push end")
+    
+        return pushVel
+
+class Push
+    constructor: (@tick, @player1, @player2, @startPush) ->
+        charge = frp.onEventMakeEvent @startPush, (_) =>
+            return (frp.tickEvery @tick, 500).once()
+
+        distanceOnCharge = charge.snapshotMany [@player1.position, @player2.position], (_, p1, p2) ->
+            return (Vector.diff p1, p2)
+
+        distance = frp.hold Vector.null(), distanceOnCharge
+        #direction = distance.map ((dist) -> dist.dir())
+
+        pushDuration = frp.onEventMakeEvent charge, => frp.tickFor @tick, 500
+        pushEnd = frp.onEventMakeEvent charge, => (frp.tickEvery @tick, 500).once()
+
+        pushVel = frp.hold 0, (frp.mergeAll [
+            pushDuration.snapshot distance, ((_, dist) -> Vector.scalar (-pullStrength*dist.length()), (dist.dir()))
+            pushEnd.constMap (Vector.null())
+            ])
+
+        distance.updates().listen (log "Distance")
+        pushDuration.listen (log "push duration")
+        pushEnd.listen (log "Push end")
+    
+        return pushVel
 
 follow = (@base, @follower) ->
     @follower.movement = @base.movement
@@ -544,3 +602,6 @@ module.exports =
     Direction:Direction
     StopMoveEvent:StopMoveEvent
     MoveEvent:MoveEvent
+    Push: Push
+    Pull: Pull
+    Vector: Vector
