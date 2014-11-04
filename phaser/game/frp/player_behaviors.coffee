@@ -214,7 +214,6 @@ class WalkAnimation
         anim = {ref:null}
         r = frp.mapB anim, ((anim) -> anim.isRunning())
         tickWhenRunning = tick.gate r
-        tickWhenRunning.listen (log "tickwalk")
         effects = [
             startMove.constMap ((anim) ->
                 anim.startRun()
@@ -225,7 +224,6 @@ class WalkAnimation
                 return anim
                 )
             tickWhenRunning.map ((dt) -> (anim) ->
-                console.log dt, anim
                 anim.tick dt
                 return anim
                 )
@@ -262,7 +260,6 @@ class Movement
             )
 
         walkAnim = WalkAnimation.mkBehavior @player, @tick, startMove, stopMove
-        walkAnim.updates().listen (log "test")
 
         modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
             localTick = frp.tickUntilEvent @tick, stopMove.once()
@@ -406,6 +403,7 @@ class Jumping
 
         wallJumpVel = dir.map ((x) -> new Vector (x*-1200), -800)
         @value2 = jumpStarters.gate @canJump
+        @value2 = @value2.gate (@jumpsSinceLand.map ((jumps) -> jumps > 1))
         @value2 = @value2.gate canWallJump
         @value2 = @value2.snapshot wallJumpVel, frp.second
 

@@ -41,18 +41,13 @@ TestState.prototype = {
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
 
-        var background3 = this.game.add.sprite (0, 0, 'background3');
-        var background2 = this.game.add.sprite (0, this.game.height - 116 - 100, 'background2');
-        var background1 = this.game.add.sprite (0, this.game.height - 70 - 100, 'background1');
-
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
-        this.game.rootGroup.add(background3);
-        this.game.rootGroup.add(background2);
-        this.game.rootGroup.add(background1);
+        // this.game.rootGroup.add(background3);
+        // this.game.rootGroup.add(background2);
+        // this.game.rootGroup.add(background1);
         this.game.rootGroup.add(this.frpWorld.trees);
-        console.log ("World", this.frpWorld.worldBlocks.value())
-        this.game.rootGroup.add(this.frpWorld.worldBlocks.value().coll_group);
+        //this.game.rootGroup.add(this.frpWorld.worldBlocks.value().coll_group);
         this.game.rootGroup.add(this.frpWorld.worldBlocks.value().block_group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].sprite);
@@ -65,7 +60,12 @@ TestState.prototype = {
 
 
         // Set 1 color bg
-        this.game.stage.backgroundColor = 0x91a477;
+      
+        this.r = 0;
+        this.g = 0;
+        this.b = 0;
+      
+        this.game.stage.backgroundColor = 0;
         this.moving = 0;
         this.jumpDown = false;
         this.blockSetDown = false;
@@ -76,6 +76,33 @@ TestState.prototype = {
       
       
         var keyboard = this.game.input.keyboard;
+        var k1 = keyboard.addKey(Phaser.Keyboard.ONE)
+        var k3 = keyboard.addKey(Phaser.Keyboard.TWO)
+        var k5 = keyboard.addKey(Phaser.Keyboard.THREE)
+        var k2 = keyboard.addKey(Phaser.Keyboard.FOUR)
+        var k4 = keyboard.addKey(Phaser.Keyboard.FIVE)
+        var k6 = keyboard.addKey(Phaser.Keyboard.SIX)
+        var step = 5;
+        k1.onDown.add (function() {
+            this.r += step;
+            console.log (this.r, this.g, this.b)
+        }, this);
+        k2.onDown.add (function() {
+            this.r -= step;
+        }, this);
+        k3.onDown.add (function() {
+            this.g += step;
+        }, this);
+        k4.onDown.add (function() {
+            this.g -= step;
+        }, this);
+        k5.onDown.add (function() {
+            this.b += step;
+        }, this);
+        k6.onDown.add (function() {
+            this.b -= step;
+        }, this);
+
         var x = keyboard.addKey(Phaser.Keyboard.X)
         var y = keyboard.addKey(Phaser.Keyboard.Y)
         x.onDown.add (function () {         
@@ -97,8 +124,14 @@ TestState.prototype = {
   render: function () {
       this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
       this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
+      this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
   },
   update: function () {
+        this.game.stage.backgroundColor = 
+            (this.r / 16)*Math.pow(16, 5) + (this.r % 16)*Math.pow(16,4)
+            +(this.g / 16)*Math.pow(16, 3) + (this.g % 16)*Math.pow(16,2)
+            +(this.b / 16)*Math.pow(16, 1) + (this.b % 16)*Math.pow(16,0)
+            ;
       var start = new Date().getTime();
       //this.wb.update();
       var that = this;

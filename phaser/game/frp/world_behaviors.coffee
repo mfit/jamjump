@@ -13,6 +13,8 @@ Direction = player.Direction
 
 shaders = require '../frp/shaders.js'
 
+render = require '../render/render.js'
+
 # combine events and their effects
 manyConstEffects = (initial, effects) ->
     funcs = []
@@ -64,15 +66,18 @@ Phaser.TileSprite.prototype.kill = Phaser.Sprite.prototype.kill
 class BlockManager
     constructor: (@game) ->
         @blocks = {}
-        @block_group = game.add.group()
-        @block_group.enableBody = true;
-        @block_group.allowGravity = false;
-        @block_group.immovable = true;
+        # @block_group = game.add.group()
+        # @block_group.enableBody = true;
+        # @block_group.allowGravity = false;
+        # @block_group.immovable = true;
 
         @coll_group = game.add.group()
         @coll_group.enableBody = true;
         @coll_group.allowGravity = false;
         @coll_group.immovable = true;
+        @coll_group.invisible = true;
+
+        @block_group = new render.BlockSpriteBatch @game
 
         #@block_group.add @coll_group
 
@@ -112,13 +117,14 @@ class BlockManager
         setIndex = @game.map.tiles[block.gid][2];
         set = @game.map.tilesets[setIndex];
 
+        console.log set.tileWidth
         block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
-                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", 2
+                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
+        @block_group.addChild block.sprite
 
         if neighbors.bottom != null
             if neighbors.bottom.hasOwnProperty 'main'
                 neighbors.bottom = neighbors.bottom.main
-            block.sprite = @block_group.add block.sprite
         #block.sprite.loadTexture block.texture, 1
             h = neighbors.bottom.sprite.body.height
             offset_y = neighbors.bottom.sprite.body.offset.y
@@ -128,7 +134,6 @@ class BlockManager
             if neighbors.top.hasOwnProperty 'main'
                 neighbors.top = neighbors.top.main
 
-            block.sprite = @block_group.add block.sprite
         #block.sprite.loadTexture block.texture, 1
             h = neighbors.top.sprite.body.height
             offset_y = neighbors.top.sprite.body.offset.y
@@ -137,7 +142,9 @@ class BlockManager
             #neighbors.top.dbg.scale.set 25, (h + 25)
             block.main = neighbors.top
         else
-            block.sprite = @coll_group.add block.sprite
+            block.sprite = @game.add.sprite (coords.x + set.tileOffset.x),
+                (coords.y + set.tileOffset.y)
+            @coll_group.add block.sprite
             w = 50
             h = 50
             xoff = 24
@@ -310,41 +317,54 @@ class World
 class ParticleGroup
     constructor: (game) ->
         @group = game.add.group();
+        @group1 = new render.ColorSpriteBatch game,
+            {r:210/255.0, g:105/255.0, b:30/255.0, a:1}
+        @group2 = new render.ColorSpriteBatch game,
+            {r:205/255.0, g:133/255.0, b:63/255.0, a:1}
+        console.log @group1
 
-        for i in [0..50]
+        @group.add @group1
+        @group.add @group2
+
+        console.log @group1
+        console.log @group2
+        console.log @group
+        # gl = @group1.fastSpriteBatch.gl
+
+        inners = []
+        outers = []
+        for i in [0..1000]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
-
-            accel = frp.hold {x:0, y:0}, (tick.map ((_) -> {x:200 * (Math.random() - 0.5), y:200*(Math.random() - 0.5)}))
-            integrateAccel = tick.snapshot accel, ((t, a) ->
-                t = t / 1000.0
-                return (oldSpeed) -> {x : oldSpeed.x + a.x * t, y : oldSpeed.y + a.y * t}
-                )
-
-            speed = frp.accum {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}, integrateAccel
-
-            integrate = tick.snapshot speed, ((t, v) ->
-                t = t / 1000.0
-                return (oldPos) -> {x: oldPos.x + v.x * t, y: oldPos.y + v.y * t}
-                )
-
-            position = frp.accum {x:200 * Math.random(), y:200*Math.random()}, integrate
-            position.updates().listen ((test, test2) -> (pos) ->
-                test.x = pos.x
-                test.y = pos.y
-                test2.x = pos.x - 1
-                test2.y = pos.y - 1
-                test2.scale.set (2 + (Math.random())*5), (2 + (Math.random())*5)
-                ) innerGlow, outerGlow
+            inners.push innerGlow
+            outers.push outerGlow
 
             innerGlow.scale.set 2, 2
             outerGlow.scale.set 4, 4
 
-            innerGlow.shader = new shaders.TestFilter 77, 233, 57
-            outerGlow.shader = new shaders.TestFilter 200, 233, 57
-            @group.add outerGlow
-            @group.add innerGlow
+            inners[i].speed = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
+            inners[i].pos = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
 
+            @group1.addChild outerGlow
+            @group2.addChild innerGlow
+ 
+        tick.listen ((dt_) ->
+            dt = dt_/1000.0
+            for _, i in inners
+                a = {x:200 * (Math.random() - 0.5), y:200 * (Math.random() - 0.5)}
+                integrateSpeed = (oldSpeed) -> {x: oldSpeed.x + a.x*dt, y: oldSpeed.y + a.y*dt}
+                inners[i].speed = integrateSpeed inners[i].speed
+                v = inners[i].speed
+                integratePos = (oldPos) -> {x: oldPos.x + v.x * dt, y: oldPos.y + v.y*dt}
+                inners[i].pos = integratePos inners[i].pos
+
+                inners[i].x = inners[i].pos.x
+                inners[i].y = inners[i].pos.y
+                outers[i].x = inners[i].pos.x - 1
+                outers[i].y = inners[i].pos.y - 2
+                outers[i].scale.set (2 + (Math.random())*5), (2 + (Math.random())*5)
+            )
+   
 module.exports.World = World
 module.exports.MoveEvent = MoveEvent
 module.exports.StopMoveEvent = StopMoveEvent
