@@ -6,6 +6,8 @@ var frp = require('../frp/frp.js');
 var player = require('../frp/player_behaviors.js');
 var b = require('../frp/world_behaviors.js');
 
+var toPhaser = require ('../frp/toPhaser.js');
+
 var tick = frp.tick
 
 function TestState() {}
@@ -33,6 +35,8 @@ TestState.prototype = {
 
         var that = this;
         this.frpWorld = frp.sync(function () {return new b.World(that.game); });
+        frp.sync(function() {toPhaser.setup(that.game, that.frpWorld);});
+        
         this.game.world.width = 20000;
         this.game.world.height = 5000;
 

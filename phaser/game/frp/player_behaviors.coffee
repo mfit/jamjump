@@ -6,19 +6,7 @@ preTick = frp.preTick
 postTick = frp.postTick
 
 class Player
-    constructor: (game, @tick, @name="p", spriteKey="runner1") ->
-        @sprite = game.add.sprite 1000, 200, spriteKey
-        @sprite.animations.add 'walk'
-        @sprite.behavior = this
-        @sprite.scale.set -1, 1
-        #@sprite.shader = new TestFilter 200, 0, 0
-        game.physics.enable @sprite, Phaser.Physics.ARCADE, true
-        @sprite.body.collideWorldBounds = true
-        if spriteKey == 'runner1'
-            @sprite.body.setSize 14, 78, 23, 2
-        else
-            @sprite.body.setSize 14, 56, 23, 10
-        
+    constructor: (@tick, @name="p", @spriteKey="runner1") ->
         @moveEvent = new frp.EventStream "MoveEvent"
         @jumpEvent = new frp.EventStream "JumpEvent"
         @setBlockEvent = new frp.EventStream "SetBlockEvent"
@@ -28,13 +16,15 @@ class Player
         @touchedWall = new frp.EventStream "TouchedWall"
 
         @jumping = new Jumping @tick, this
-        startMovement = new Movement @tick, this
+        #startMovement = new Movement @tick, this
 
-        [@setMovementSystem, @movement] = frp.selector (startMovement.value), {
-            'BaseMovement': (tick, _this) ->
-                    movement = new Movement tick, _this
-                    return movement.value
-        }, @tick, this
+        @setMovementSystem = new frp.EventStream
+        @movement = new Movement @tick, this
+        # [@setMovementSystem, @movement] = frp.selector (startMovement.value), {
+        #     'BaseMovement': (tick, _this) ->
+        #             movement = new Movement tick, _this
+        #             return movement.value
+        # }, @tick, this
         @blockSetter = new BlockSetter @tick, @setBlockEvent
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
@@ -54,21 +44,14 @@ class Player
         last = {ref:null}
         last.ref = frp.hold false, (@jumpEvent.snapshot last, ((_, old) -> not old))
 
-        @pushBox = new CollisionBox game, @tick, this, (last.ref.updates())
+        @pushBox = new CollisionBox @tick, (last.ref.updates())
         follow this, @pushBox
 
-        preTick.snapshotEffect @movement, ((_, m) =>
-            @pushBox.setPos.send [@sprite.body.x, @sprite.body.y]
-            )
-
-        t = postTick.snapshotMany [@movement, @pushBox.movement], ((t, speed, boxSpeed) =>
-            @sprite.body.velocity.x = speed.x
-            @sprite.body.velocity.y = speed.y
-            )
-        t.listen ((v) ->)
+        preTick.snapshotEffect @position, (_, pos) =>
+            @pushBox.setPos.send [pos.x, pos.y]
 
 class CollisionBox
-    constructor: (game, @tick, @owner,
+    constructor: (@tick, 
             @setActive=new frp.EventStream("SetActive"),
             @addColliders=new frp.EventStream ("addColliders")) ->
         @setPos = new frp.EventStream "SetCollisionBoxPos"
@@ -109,104 +92,17 @@ class CollisionBox
         @offset = pushs.at 0
         #@offset.updates().listen (log "Offset")
 
-        # ENDPOINT
-        @setPos.snapshotEffect @offset, (([x, y], offset) =>
-            @sprite.body.x = x + offset
-            @sprite.body.y = y
-        )
-
-        @sprite = game.add.sprite 100, 200, 'pixel'
-        @sprite.scale.set 20, 20
-        @sprite.shader = new shaders.TestFilter 0, 0, 0, 0.2
-        game.physics.enable @sprite, Phaser.Physics.ARCADE
-        @sprite.body.collideWorldBounds = false
-        #@sprite.body.setSize 7, 28, 3, 0
-        @sprite.body.gravity.y = 1050
-        @sprite.allowGravity = false#true
-
         @active = frp.hold false, @setActive
-        @active.updates().listen ((active) =>
-            @sprite.shader.uniforms.color.value.x = active
-            )
-
         @collidesWith = frp.accum [], (@addColliders.map ((c) -> (cs) ->
             cs.push c
             return cs
             ))
-
-        doCollision = preTick.gate @active
-        doCollision.snapshotEffect @collidesWith, ((_, colliders) =>
-            for collider in colliders
-                game.physics.arcade.collide collider.sprite, @sprite, (otherSprite, sprite) =>
-                    if otherSprite.hasOwnProperty 'touchEvent'
-                        otherSprite.touchEvent.send sprite
-            )
 
 numObjects = (o) ->
     sum = 0
     for x of o
         sum += 1
     return sum
-
-class WalkAnimation
-    constructor: (@player) ->
-        frames = @player.sprite.animations.totalFrames
-        @player.sprite.animations.loop = true
-        @running = false
-        @advance = false
-
-        @msPerFrame = 50
-        @leftover = 0
-
-    tick: (dt) ->
-        if @leftover + dt > @msPerFrame
-            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 3)
-                @player.sprite.animations.frame = 4
-                @running = false
-                @leftover = 0
-                return
-
-            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 7)
-                @player.sprite.animations.frame = 0
-                @running = false
-                @leftover = 0
-                return
-
-            if @player.sprite.animations.currentFrame.index == 7
-                @player.sprite.animations.frame = 0
-            else
-                @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
-            @leftover = @leftover - @msPerFrame
-
-        @leftover += dt
-
-    startRun: () ->
-        @advance = true
-        @running = true
-
-    stopRun: () ->
-        @advance = false
-
-    isRunning: -> @running
-
-    @mkBehavior: (player, tick, startMove, stopMove) ->
-        # we only need to step the animation when it is running
-        anim = {ref:null}
-        r = frp.mapB anim, ((anim) -> anim.isRunning())
-        tickWhenRunning = tick.gate r
-
-        anim.ref = frp.accumAll (new WalkAnimation player), [
-            startMove.constMap (anim) ->
-                anim.startRun()
-                return anim
-            stopMove.constMap (anim) ->
-                anim.stopRun()
-                return anim
-            tickWhenRunning.map (dt) -> (anim) ->
-                anim.tick dt
-                return anim
-            ]
-        return anim.ref
 
 class Dash
     @mkBehavior: (tick, startDash, lookingDirection) ->
@@ -228,12 +124,8 @@ class Movement
         stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
         direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
-        direction.updates().listen ((dir) =>
-            @player.sprite.scale.set (-dir.x), 1
-            )
-
-        walkAnim = WalkAnimation.mkBehavior @player, @tick, startMove, stopMove
-
+        @direction = direction
+        
         modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
             localTick = frp.tickUntilEvent @tick, stopMove.once()
             v = 100 * direction.dir.x
@@ -315,6 +207,11 @@ class Movement
                 (old) -> Vector.add old, v)
             dash
             ])
+        # FIXME
+        @value.direction = @direction
+        @value.startMove = startMove
+        @value.stopMove = stopMove
+        return @value
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
 upperCap = (v, cap) -> if v > cap then return cap else v

@@ -11,10 +11,6 @@ StopMoveEvent = player.StopMoveEvent
 MoveEvent = player.MoveEvent
 Direction = player.Direction
 
-shaders = require '../frp/shaders.js'
-
-render = require '../render/render.js'
-
 # combine events and their effects
 manyConstEffects = (initial, effects) ->
     funcs = []
@@ -60,27 +56,9 @@ class WinBlock
         @texture = 'winblock'
         @touchEvent = new frp.EventStream
 
-# hack
-Phaser.TileSprite.prototype.kill = Phaser.Sprite.prototype.kill
-
 class BlockManager
-    constructor: (@game) ->
+    constructor: () ->
         @blocks = {}
-        # @block_group = game.add.group()
-        # @block_group.enableBody = true;
-        # @block_group.allowGravity = false;
-        # @block_group.immovable = true;
-
-        @coll_group = game.add.group()
-        @coll_group.enableBody = true;
-        @coll_group.allowGravity = false;
-        @coll_group.immovable = true;
-        @coll_group.invisible = true;
-
-        @block_group = new render.BlockSpriteBatch @game
-
-        #@block_group.add @coll_group
-
         @blockSize = 50
 
     toWorldCoords: (x, y) ->
@@ -102,61 +80,9 @@ class BlockManager
         if !@blocks.hasOwnProperty y
             @blocks[y] = {}
         @blocks[y][x] = block
-        neighbors =
-            left: if @blocks[y].hasOwnProperty (x-1) then @blocks[y][x-1] else null
-            right: if @blocks[y].hasOwnProperty (x+1) then @blocks[y][x+1] else null
-            top: if (@blocks.hasOwnProperty (y-1)) and @blocks[y-1].hasOwnProperty (x) then @blocks[y-1][x] else null
-            bottom: if (@blocks.hasOwnProperty (y+1)) and @blocks[y+1].hasOwnProperty x then @blocks[y+1][x] else null
 
         block.x = x
         block.y = y
-
-        coords = @toWorldCoords x, y
-
-        setIndex = @game.map.tiles[block.gid][2];
-        set = @game.map.tilesets[setIndex];
-
-        block.sprite = @game.add.tileSprite (coords.x + set.tileOffset.x),
-                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
-        @block_group.addChild block.sprite
-
-        if neighbors.bottom != null
-            if neighbors.bottom.hasOwnProperty 'main'
-                neighbors.bottom = neighbors.bottom.main
-        #block.sprite.loadTexture block.texture, 1
-            h = neighbors.bottom.sprite2.body.height
-            offset_y = neighbors.bottom.sprite2.body.offset.y
-            neighbors.bottom.sprite2.body.setSize 50, (h + 50), 24, (offset_y - 50)
-            block.main = neighbors.bottom
-        else if neighbors.top != null
-            if neighbors.top.hasOwnProperty 'main'
-                neighbors.top = neighbors.top.main
-
-        #block.sprite.loadTexture block.texture, 1
-            h = neighbors.top.sprite2.body.height
-            offset_y = neighbors.top.sprite2.body.offset.y
-            neighbors.top.sprite2.body.setSize 50, (h + 50), 24, offset_y
-            #neighbors.bottom.dbg.y -= 25
-            #neighbors.top.dbg.scale.set 25, (h + 25)
-            block.main = neighbors.top
-        else
-            block.sprite2 = @game.add.sprite (coords.x + set.tileOffset.x), (coords.y + set.tileOffset.y)
-            @coll_group.add block.sprite2
-            w = 50
-            h = 50
-            xoff = 24
-            yoff = 24
-            #@game.physics.enable block.sprite, Phaser.Physics.ARCADE
-            block.sprite2.body.setSize w, h, xoff, yoff
-            block.sprite2.body.immovable = true
-            block.sprite.block = block
-            block.sprite2.block = block
-
-            #dbg_block = @game.add.sprite (block.sprite.body.x + xoff), (block.sprite.body.y + yoff), "pixel"
-            #dbg_block.scale.set w, h
-            #dbg_block.shader = new shaders.TestFilter 255, 0, 0
-            #block.dbg = dbg_block
-            #@block_group.add dbg_block
 
     removeBlock: (x, y) ->
         if @blocks.hasOwnProperty(y) and @blocks[y].hasOwnProperty x
@@ -166,27 +92,34 @@ class BlockManager
 
     copy: (mgr) ->
 
-    @mkBehaviors: (game) ->
+    @mkBehaviors: () ->
         # command events
         addBlock = new frp.EventStream # addBlock {x:x, y:y, block: new Block()}
         removeBlock = new frp.EventStream
 
+        addedBlock = new frp.EventStream
+        removedBlock = new frp.EventStream
+
         effects = [
            addBlock.map ((blockInfo) -> (bm) ->
                 block = blockInfo.block
-                bm.addBlock blockInfo.x, blockInfo.y, block # FIXME test if block was added
-                if block.removeMeEvent
-                    block.removeMeEvent.listen ((v) -> removeBlock.send block)
+                if bm.canAddBlock blockInfo.x, blockInfo.y
+                    bm.addBlock blockInfo.x, blockInfo.y, block # FIXME test if block was added
+                    if block.removeMeEvent
+                        block.removeMeEvent.listen ((v) -> removeBlock.send block)
+                    addedBlock.send blockInfo
                 return bm
                 )
            removeBlock.map ((block) -> (bm) ->
                 bm.removeBlock (block.x), (block.y)
+                removedBlock.send {x:block.x, y:block.y}
                 return bm
                 )
         ]
 
-        bm = frp.accum (new BlockManager(game)), (frp.mergeAll effects).mkUpdateEvent()
+        bm = frp.accum (new BlockManager()), (frp.mergeAll effects).mkUpdateEvent()
         bm.addBlock = addBlock
+        bm.addedBlock = addedBlock
         bm.removeBlock = removeBlock
         return bm
 
@@ -194,46 +127,33 @@ class Parallax
     constructor: ->
 
 class Camera
-    constructor: (@tick, @game, world) ->
-        @game.camera.bounds = null
-        
-        world.players[0].position.updates().listen ((pos) =>
-            distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
-            distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
-            if (Math.abs distance) > 200
-                 if (distance > 0)
-                    @game.camera.x = @game.camera.x + (-distance + 200)
-                 else if distance < 0
-                    @game.camera.x = @game.camera.x + (-distance - 200)
-            if (Math.abs distance_y) > 200
-                if distance_y < 0
-                    @game.camera.y += (-distance_y - 200)
-                else if distance_y > 0
-                    @game.camera.y += (-distance_y + 200)
-            )
+    constructor: (@tick, world) ->
+        # find me in frp/toPhaser.coffee
 
         @shakeIt()
 
     shakeIt: ->
-        @shakeMe = new frp.EventStream
+        @rotating = frp.pure 0
+        # @shakeMe = new frp.EventStream
 
-        reset = new frp.EventStream
-        effects = [
-            reset.constMap (new frp.Behavior 0)
-            @shakeMe.map ((v) =>
-                timer = (frp.mkCountdown 300)
-                counter = frp.accum 10, (@tick.map ((t) -> (a) -> a - t/10.0))
-                rotation = counter.map ((v) -> (Math.sin v) / 16) # frp.hold 0 (@tick.map ((t) -> Math.sin t)) #frp.accum 0 effects
-                timer.listen ((_) -> reset.send true)
-                return rotation
-            )
-        ]
-        rotating = frp.hold (new frp.Behavior 0), (frp.mergeAll effects)
-        rotating = frp.switchBeh rotating
-        rotating.updates().listen ((v) => @game.world.rotation = v)
+        # reset = new frp.EventStream
+        # effects = [
+        #     reset.constMap (new frp.Behavior 0)
+        #     @shakeMe.map ((v) =>
+        #         timer = (frp.mkCountdown 300)
+        #         counter = frp.accum 10, (@tick.map ((t) -> (a) -> a - t/10.0))
+        #         rotation = counter.map ((v) -> (Math.sin v) / 16) # frp.hold 0 (@tick.map ((t) -> Math.sin t)) #frp.accum 0 effects
+        #         timer.listen ((_) -> reset.send true)
+        #         return rotation
+        #     )
+        # ]
+
+        # rotating = frp.hold (new frp.Behavior 0), (frp.mergeAll effects)
+        # @rotating = frp.switchBeh rotating
+        #rotating.updates().listen ((v) => @game.world.rotation = v)
 
 class World
-    constructor: (game) ->
+    constructor: () ->
         @tick = tick
 
         # FIXME doesnt work :/
@@ -251,12 +171,13 @@ class World
     
         playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
-            new player.Player game, playerTick, "p1", 'runner1'
+            new player.Player playerTick, "p1", 'runner1'
             #new player.Player game, playerTick, "p2", 'runner2'
          #   new player.Player game, "p3"
         ]
 
         # TODO move this inside the player
+        console.log @players[0]
         @players[0].pushVel.ref = frp.pure (player.Vector.null())
         # @players[1].pushVel.ref = frp.pure (player.Vector.null());
         # @players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].jumpEvent
@@ -267,36 +188,8 @@ class World
 
         #@players[0].pushBox.addColliders.send (@players[1])
     
-        @worldBlocks = BlockManager.mkBehaviors game
-        @camera = new Camera tick, game, this
-        @particles = new ParticleGroup game
-
-        @trees = game.add.group();
-        @tree = game.add.sprite 0, 500, 'trees'
-        @tree.shader = new shaders.ColorFilter {x:1, y:1, z:1}
-        #@tree.blendMode = PIXI.blendModes.ADD
-        @trees_high = game.add.sprite 0, 500, 'trees_high'
-        @trees_high.blendMode = PIXI.blendModes.ADD
-
-        @trees_high.shader = new shaders.IntensityFilter 0, {x:1, y:1, z:0.8}
-
-        tick.listen ((t) =>
-            width = @trees_high.texture.width
-            height = @trees_high.texture.height
-            @trees_high.shader.uniforms.relPos.value.x = game.input.x - width/2.0 + game.camera.x;
-            @trees_high.shader.uniforms.relPos.value.y = + 500 - game.input.y + height + game.camera.y
-            @trees_high.shader.uniforms.color.value.x = 0.8 + 0.2*(game.input.x - width/2.0 + game.camera.x) / width
-            @trees_high.shader.uniforms.color.value.y = (0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
-            @trees_high.shader.uniforms.color.value.z = 0.2*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
-            #@trees_high.shader.uniforms.color.value.y = 0.5 + (game.input.x - width/2.0 + game.camera.x) / width
-            @trees_high.shader.dirty = true
-            @tree.shader.uniforms.color.value.y = 0.9 + 0.1*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
-            @tree.shader.uniforms.color.value.z = 0.7 + 0.3*(0.5 + (game.input.x - width/2.0 + game.camera.x) / width)
-            @tree.shader.dirty = true
-            )
-
-        @trees.add @tree
-        @trees.add @trees_high
+        @worldBlocks = BlockManager.mkBehaviors()
+        @camera = new Camera tick, this
 
         for player in @players
             setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
@@ -308,76 +201,9 @@ class World
             # side effects
             setting.listen ((v) -> )
 
-            s = preTick.onTickDo @worldBlocks, (((player) => (blockManager) =>
-                 game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
-                    if group_sprite.body.touching.up == true
-                        group_sprite.block.touchEvent.send true
-                    if sprite.body.touching.down == true
-                        player.landedOnBlock.send true
-
-                    if sprite.body.touching.left == true 
-                        player.touchedWall.send (-1)
-                    if sprite.body.touching.right == true
-                        player.touchedWall.send 1
-                        
-                 ) player)
-            # side effects
-            s.listen ((v) ->)
-
     save: ->
     reload: ->
-
-class ParticleGroup
-    constructor: (game) ->
-        @group = game.add.group();
-        @group1 = new render.ColorSpriteBatch game,
-            {r:210/255.0, g:105/255.0, b:30/255.0, a:1}
-        @group2 = new render.ColorSpriteBatch game,
-            {r:205/255.0, g:133/255.0, b:63/255.0, a:1}
-        console.log @group1
-
-        @group.add @group1
-        @group.add @group2
-
-        console.log @group1
-        console.log @group2
-        console.log @group
-        # gl = @group1.fastSpriteBatch.gl
-
-        inners = []
-        outers = []
-        for i in [0..500]
-            innerGlow = new Phaser.Particle game, i, 200, 'pixel'
-            outerGlow = new Phaser.Particle game, i, 200, 'pixel'
-            inners.push innerGlow
-            outers.push outerGlow
-
-            innerGlow.scale.set 2, 2
-            outerGlow.scale.set 4, 4
-
-            inners[i].speed = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
-            inners[i].pos = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
-
-            @group1.addChild outerGlow
-            @group2.addChild innerGlow
- 
-        tick.listen ((dt_) ->
-            dt = dt_/1000.0
-            for _, i in inners
-                a = {x:200 * (Math.random() - 0.5), y:200 * (Math.random() - 0.5)}
-                integrateSpeed = (oldSpeed) -> {x: oldSpeed.x + a.x*dt, y: oldSpeed.y + a.y*dt}
-                inners[i].speed = integrateSpeed inners[i].speed
-                v = inners[i].speed
-                integratePos = (oldPos) -> {x: oldPos.x + v.x * dt, y: oldPos.y + v.y*dt}
-                inners[i].pos = integratePos inners[i].pos
-
-                inners[i].x = inners[i].pos.x
-                inners[i].y = inners[i].pos.y
-                outers[i].x = inners[i].pos.x - 1
-                outers[i].y = inners[i].pos.y - 2
-                outers[i].scale.set (2 + (Math.random())*5), (2 + (Math.random())*5)
-            )
-   
+  
 module.exports.World = World
 module.exports.MoveEvent = MoveEvent
 module.exports.StopMoveEvent = StopMoveEvent
