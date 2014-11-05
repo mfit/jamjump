@@ -1,5 +1,5 @@
 // TiledLoader("tiled_level.json", {'spritesheet': 'assets/spritesheet.png'}, ['Tile Layer 1']);
-var b = require('../frp/behavior2.js')
+var b = require('../frp/world_behaviors.js')
 
 function TiledLoader(tiled_json_file, tileset_images, layers) {
     this.filename = tiled_json_file;
