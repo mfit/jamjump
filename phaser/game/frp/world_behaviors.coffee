@@ -77,7 +77,7 @@ class BlockManager
         @coll_group.immovable = true;
         @coll_group.invisible = true;
 
-        @block_group = game.add.group();#new render.BlockSpriteBatch @game
+        @block_group = new render.BlockSpriteBatch @game
 
         #@block_group.add @coll_group
 
@@ -337,7 +337,7 @@ class ParticleGroup
 
         inners = []
         outers = []
-        for i in [0..100]
+        for i in [0..500]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
             inners.push innerGlow

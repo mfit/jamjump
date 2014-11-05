@@ -65,24 +65,25 @@ BlockSpriteBatch::_renderWebGL = (renderSession) ->
 
         ids = {}
 
-        renderSession.spriteBatch.start()       
-        for child in @children
-            if (not child.tilingTexture) or (child.refreshTexture)
-                child.generateTilingTexture true
+        renderSession.spriteBatch.stop()       
 
-                if (child.tilingTexture) and (child.tilingTexture.needsUpdate)
-                    PIXI.updateWebGLTexture child.tilingTexture.baseTexture, renderSession.gl
-                    child.tilingTexture.needsUpdate = false
+        @bm.render()
+        # for child in @children
+        #     if (not child.tilingTexture) or (child.refreshTexture)
+        #         child.generateTilingTexture true
 
-                if @tm_texture_hack == false
-                    @tm.createGLTexture child.tilingTexture.baseTexture
-                    @tm.uploadTexture child.tilingTexture.baseTexture
-                    @tm.printDebug()
-                    @tm_texture_hack = true
-            else
-                renderSession.spriteBatch.renderTilingSprite child
+        #         if (child.tilingTexture) and (child.tilingTexture.needsUpdate)
+        #             PIXI.updateWebGLTexture child.tilingTexture.baseTexture, renderSession.gl
+        #             child.tilingTexture.needsUpdate = false
 
-        renderSession.spriteBatch.stop()
+        #         if @tm_texture_hack == false
+        #             @tm.createGLTexture child.tilingTexture.baseTexture
+        #             @tm.uploadTexture child.tilingTexture.baseTexture
+        #             @tm.printDebug()
+        #             @tm_texture_hack = true
+        #     else
+        #         renderSession.spriteBatch.renderTilingSprite child
+
 
 BlockSpriteBatch::initWebGL = (gl) ->
     @tm = new renderer.TextureManager gl
@@ -91,6 +92,9 @@ BlockSpriteBatch::initWebGL = (gl) ->
     currentProg = gl.getParameter gl.CURRENT_PROGRAM
     shader = new BlockShader gl
     gl.useProgram currentProg
+
+    @bm = new renderer.BufferManager gl
+    @bm.upload()
 
     @fastSpriteBatch = new PIXI.WebGLFastSpriteBatch gl
     @fastSpriteBatch.begin = (spriteBatch, @renderSession) ->

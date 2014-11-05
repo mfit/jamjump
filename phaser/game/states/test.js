@@ -129,9 +129,9 @@ TestState.prototype = {
       return -1;
   },
   render: function () {
-      this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
-      this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
-      this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
+      // this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
+      // this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
+      // this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
   },
   update: function () {
         this.game.stage.backgroundColor = 

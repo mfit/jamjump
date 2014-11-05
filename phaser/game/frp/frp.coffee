@@ -57,6 +57,7 @@ class EventStream
                 for firing in obs.firings
                     handle firing
             return (unlisten id)
+
         listen = new Listen l
         listen.obs = obs
 
@@ -65,13 +66,17 @@ class EventStream
                 console.warn "event sent outside sync"
 
             obs.firings.push a
-            system.scheduleLast (->
-                obs.firings = []
-                )
+            system.final.push (-> obs.firings = [])
+            # system.scheduleLast (->
+            #     obs.firings = []
+            #     )
 
             for listenId, listenCallback of obs.listeners
                 listenCallback a
+
         return [listen, push, node]
+
+    push: (a) ->
 
     linkedListen: (mNode, suppressEarlierFirings, handle) ->
         l = @getListen()
@@ -300,33 +305,42 @@ class System
         @next_id += 1
         return id
 
-    sync: (f) ->
-        @syncing = true
-
-        taskLoop = null
-        taskLoop = =>
-            if @queue1.length != 0
-                task = @queue1[0]
-                @queue1.shift()
+    taskLoop: ->
+        # label wont work without this if
+        if false then return
+        `queue1: //`
+        while true
+            tasks = []
+            for task in @queue1 
+                tasks.push task
+            @queue1 = []
+            for task in tasks
                 task()
-                taskLoop()
-            else
-                mTask = @queue2.pop()
-                if mTask != null
-                    mTask.value()
-                    taskLoop()
-                else
-                    if @final.length != 0
-                        task = @final[0]
-                        @final.shift()
-                        task()
-                        taskLoop()
+
+            if @queue1.length > 0
+                `continue queue1`
+
+            while (mTask = @queue2.pop())
+                mTask.value()
+                if @queue1.length > 0
+                    `continue queue1`
+
+            if @final.length != 0
+                task = @final[0]
+                @final.shift()
+                task()
+                continue
 
             if @post.length != 0
                 task = @post[0]
                 @post.shift()
                 task()
-                taskLoop()
+                continue
+            return
+        return
+
+    sync: (f) ->
+        @syncing = true
 
         out = null
 
@@ -336,7 +350,7 @@ class System
         @final = []
         @post = []
 
-        taskLoop()
+        @taskLoop()
         
         @syncing = false
 
@@ -613,6 +627,7 @@ class KeepAlive
     constructor: ->
 
 hold = (initA, ea) ->
+    ea = ea.mkUpdateEvent()
     bs = new BehaviorState initA, new Nothing()
     b = null
 
@@ -853,9 +868,8 @@ split = (esa) ->
             unlistener = esa.linkedListen node, false, ((as) ->
                 postUpdates = []
                 for a in as
-                    ((x) -> postUpdates.push (->
-                        push x)) a
-                system.schedulePost postUpdates
+                    f = (x) -> system.post.push (-> push x)
+                    f a
                 )
             return (->
                 debug "unlistening split #{newE.getName()}"
@@ -922,6 +936,7 @@ once = (e) ->
     return newEvent
 
 accum = (z, efa) ->
+    efa = efa.mkUpdateEvent()
     s = {ref:null}
     s.ref = hold z, (snapshot efa, s, ((f, v) -> f v))
     s.ref.name = [s.ref.name, "accum"]
@@ -933,11 +948,11 @@ never = EventStream.new("Never")
 
 pure = (a) -> constantB a
 
+# creates an event that triggers every 'time' milliseconds
+# the base tick determines the increment step
 tickEvery = (base_tick, time) ->
     counter = {ref:null}
-
     tickEvent = filter (updates counter), ((v) -> v > time) # tick every time milliseconds
-
     effects = mergeAll [
         # reset on tick
         # there is always an overflow (e.g. tick = 16, time = 100 -> a will be 112
@@ -1031,7 +1046,8 @@ tickAfter = (baseTick, t) ->
     v = (updates timeTicking).filter (([tick, _]) -> tick > t)
     return v.at 1
 
-timer = (baseTick, time) ->
+# create an event that triggers once after time milliseconds
+timer = (baseTick, time) -> #(tickEvery baseTick, time).once()
     timeTicking = accum 0, (baseTick.map ((t) -> (a) -> a + t))
     e = (updates timeTicking).filter ((t) -> t > time)
     return e.once()
@@ -1119,7 +1135,8 @@ module.exports =
         beh = hold initA, e
         beh.update = e.send
         return beh
-    mergeAll: (es) -> (mergeAll es).mkUpdateEvent()
+    #mergeAll: (es) -> (mergeAll es).mkUpdateEvent()
+    mergeAll: mergeAll
     accum:accum
     hold:hold
     apply:apply
@@ -1128,7 +1145,8 @@ module.exports =
     updates:updates
     values:values
     switchE:switchE
-    merge: (e1, e2) -> (merge e1, e2).mkUpdateEvent()
+    #merge: (e1, e2) -> (merge e1, e2).mkUpdateEvent()
+    merge: merge
     never:never
     execute:execute
     pure:pure

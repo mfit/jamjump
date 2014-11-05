@@ -160,9 +160,82 @@ class BlockVertexStatic
     getVertices: ->
         return []
 
+class Shader
+    constructor: (gl) ->
+        @program = PIXI.compileProgram gl, [
+            'attribute vec2 vertexPosition;'
+            'void main(void) {'
+            '    gl_Position = vec4(vertexPosition, 0, 1);'
+            '}'
+            ], [
+            'void main(void) {'
+            '    gl_FragColor = vec4(1, 0, 0, 1);'
+            '}'
+            ] 
+
 class BufferManager
-    constructor: ->
+    constructor: (@gl) ->
+        gl = @gl
+        @vertexBuffer = gl.createBuffer()
+        @indexBuffer = gl.createBuffer()
+        # gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        # gl.bufferData gl.ELEMENT_ARRAY_BUFFER, [], gl.STATIC_DRAW
+
+        # gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+        # gl.bufferData gl.ARRAY_BUFFER, [], gl.DYNAMIC_DRAW
+
+        @shader = new Shader @gl
+
+    upload: ->
+        gl = @gl
+        elementData = [0, 1, 2, 0, 2, 3]
+        @vertexData = [-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5]
+
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bufferData gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(elementData), gl.STATIC_DRAW
+
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+        gl.bufferData gl.ARRAY_BUFFER, new Float32Array(@vertexData), gl.DYNAMIC_DRAW
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+
+        gl.useProgram @shader.program
+        vertexPos = gl.getAttribLocation @shader.program, 'vertexPosition'
+        gl.vertexAttribPointer vertexPos, 2, gl.FLOAT, false, 8, 0
+        gl.enableVertexAttribArray vertexPos
+
+        # restore state
+        gl.useProgram oldProg
+
+    render: ->
+        gl = @gl
+        gl.viewport 0, 0, 1920, 768
+        gl.disable gl.BLEND
+        gl.disable gl.DEPTH_TEST
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+        gl.useProgram @shader.program
+        vertexPos = gl.getAttribLocation @shader.program, 'vertexPosition'
+        gl.vertexAttribPointer vertexPos, 2, gl.FLOAT, false, 8, 0
+        gl.enableVertexAttribArray vertexPos
+
+        gl.drawElements gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0
+
+
+        gl.enable gl.BLEND
+        #gl.enable gl.DEPTH_TEST
+
+        # restore state
+        gl.useProgram oldProg
+
+render = (gl) ->
+    return
 
 module.exports =
     TextureManager:TextureManager
+    BufferManager:BufferManager
     
