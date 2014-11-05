@@ -440,48 +440,6 @@ class Velocity
                 v*(drag*(1 - dt/1000.0))))
         return velocity
 
-class BaseComponents
-    constructor: (@tick
-                 , velocityCap = 300
-                 , @modAccel = new frp.EventStream()
-                 , @modVelocity = new frp.EventStream()
-                 , @modPosition = new frp.EventStream()) ->
-        accel = frp.accum (Vector.null()), @modAccel
-        accelExists = accel.map ((a) -> (a.length()) > 0.005)
-        accelTick = @tick.gate accelExists
-
-        intVelocity = {ref:null}
-        velocity = {ref:null}
-        capVelocity = {ref:null}
-
-        velChangers = (frp.mergeAll [
-            @modVelocity
-            frp.mapE (frp.updates intVelocity), ((v) -> (_) -> v)
-            ])
-        velChangers = velChangers.map ((f) -> (v) ->
-            v = f(v)
-            if v.x < -velocityCap
-                return new Vector (-velocityCap), 0
-            if v.x > velocityCap
-                return new Vector velocityCap, 0
-            return v
-            )
-    
-        velocity.ref = frp.accum (Vector.null()), velChangers
-
-        intVelocity.ref = frp.integrateB accelTick, velocity, accel, Vector.add, Vector.scalar
-        velocityExists = velocity.ref.map ((v) -> (v.length()) > 0.005)
-        velocityTick = @tick.gate velocityExists
-
-        intPosition = {ref:null}
-        position = frp.accum (Vector.null()), (frp.mergeAll [
-            @modPosition
-            frp.mapE (frp.updates intPosition), ((v) -> (_) -> v)
-            ])
-        intPosition.ref = frp.integrateB velocityTick, position, velocity, Vector.add, Vector.scalar
-
-        @velocity = velocity.ref
-
 pullStrength = 3
 class Pull
     constructor: (@tick, @player1, @player2, @startPush) ->
