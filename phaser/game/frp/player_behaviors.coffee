@@ -18,11 +18,6 @@ class Player
             @sprite.body.setSize 14, 78, 23, 2
         else
             @sprite.body.setSize 14, 56, 23, 10
-
-        @dbg = game.add.sprite (100 + 10), (200 + 10), 'pixel'
-        @dbg.scale.set 14, 56
-        @dbg.shader = new shaders.TestFilter 1, 0, 0
-
         
         @moveEvent = new frp.EventStream "MoveEvent"
         @jumpEvent = new frp.EventStream "JumpEvent"
@@ -40,29 +35,21 @@ class Player
                     movement = new Movement tick, _this
                     return movement.value
         }, @tick, this
-        @blockSetter = new BlockSetter @tick, this
+        @blockSetter = new BlockSetter @tick, @setBlockEvent
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
-        setPosition = new frp.EventStream "SetPosition"
+        @setPosition = new frp.EventStream "SetPosition"
 
         int = @tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)
     
         effects = [
-            setPosition.map ((pos) -> (oldPos) -> pos)
+            @setPosition.map ((pos) -> (oldPos) -> pos)
             int.map ((dPos) -> (pos) ->
                     new Direction (pos.x + dPos), (pos.y))
         ]
 
         @position = frp.accum (new Direction 0, 0), (frp.mergeAll effects)
-        @setPosition = (x, y) -> setPosition.send x, y
 
-
-        @position.updates().listen ((pos) =>
-            @dbg.x = pos.x
-            @dbg.y = pos.y
-            )
-        #@sprite.body.gravity.y = 1050
-        #@sprite.allowGravity = true
 
         last = {ref:null}
         last.ref = frp.hold false, (@jumpEvent.snapshot last, ((_, old) -> not old))
@@ -73,21 +60,10 @@ class Player
         preTick.snapshotEffect @movement, ((_, m) =>
             @pushBox.setPos.send [@sprite.body.x, @sprite.body.y]
             )
-        # @jumping.value2.listen ((speed) =>
-        #     console.log "walljump", speed
-        #     @sprite.body.velocity.x += speed.x
-        #     @sprite.body.velocity.y += speed.y
-        #     )
-
-        # @jumping.value.listen ((vy) =>
-        #     @sprite.body.velocity.y -= vy
-        #     #@pushBox.sprite.body.velocity.y -= vy0ebb
-        #     )
 
         t = postTick.snapshotMany [@movement, @pushBox.movement], ((t, speed, boxSpeed) =>
             @sprite.body.velocity.x = speed.x
             @sprite.body.velocity.y = speed.y
-            #@pushBox.sprite.body.velocity.x = speed.vx
             )
         t.listen ((v) ->)
 
@@ -96,43 +72,46 @@ class CollisionBox
             @setActive=new frp.EventStream("SetActive"),
             @addColliders=new frp.EventStream ("addColliders")) ->
         @setPos = new frp.EventStream "SetCollisionBoxPos"
-
         @startPush = new frp.EventStream "StartPush"
 
-        # on start push event fires for 1000ms
+        # canStart blocks the @startPush event until the created behavior is done
         canStart = {ref:null}
         reallyStartPush = @startPush.gate canStart
         reallyStartPush = reallyStartPush.constMap @tick
 
+        # the callback returns a behavior with a list of values
         pushs = frp.onEventMakeBehaviors [0, true], reallyStartPush, ((tick) ->
-            time = frp.tickFor tick, 1000
-            time2 = frp.tickAfter tick, 1000
-            time2 = frp.tickFor time2, 1000
-            end = (frp.tickAfter tick, 2000).once()
+            [timeA, timeB] = frp.tickSplitTime tick, 1000
+            [timeB, end] = frp.tickSplitTime timeB, 1000
+            end = end.once()
 
-            b = frp.hold false, (end.constMap true)
+            goRight = frp.integrate (timeA.times 2), 0, (frp.pure 100)
+            goLeft = frp.integrate (timeB.times 2), 200, (frp.pure (-100))
 
-            goRight = frp.integrate (time.times 2), 0, (frp.pure 100)
-            goLeft = frp.integrate (time2.times 2), 200, (frp.pure (-100))
-
-            effects = [
-                time2.once().constMap goLeft
+            # three behaviors:
+                # we start to move right
+                # when timeB triggers we move left
+                # reset on end
+            final = frp.holdAll goRight, [
+                timeB.once().constMap goLeft
                 end.constMap (frp.pure 0)
-            ]
-            final = frp.hold goRight, (frp.mergeAll effects)
+                ]
             final = frp.switchB final
             return [
                 final
-                b
+                # when this behavior is finished we accept a new one
+                frp.hold false, (end.constMap true)
                 ]
             )
-        canStart.ref = pushs.at 1
+
+        # get the snd and fst element of the behavior
+        canStart.ref = pushs.at 1 # Behavior [a] -> Behavior a
         @offset = pushs.at 0
         #@offset.updates().listen (log "Offset")
 
+        # ENDPOINT
         @setPos.snapshotEffect @offset, (([x, y], offset) =>
             @sprite.body.x = x + offset
-
             @sprite.body.y = y
         )
 
@@ -211,46 +190,40 @@ class WalkAnimation
     isRunning: -> @running
 
     @mkBehavior: (player, tick, startMove, stopMove) ->
+        # we only need to step the animation when it is running
         anim = {ref:null}
         r = frp.mapB anim, ((anim) -> anim.isRunning())
         tickWhenRunning = tick.gate r
-        effects = [
-            startMove.constMap ((anim) ->
+
+        anim.ref = frp.accumAll (new WalkAnimation player), [
+            startMove.constMap (anim) ->
                 anim.startRun()
                 return anim
-                )
-            stopMove.constMap ((anim) ->
+            stopMove.constMap (anim) ->
                 anim.stopRun()
                 return anim
-                )
-            tickWhenRunning.map ((dt) -> (anim) ->
+            tickWhenRunning.map (dt) -> (anim) ->
                 anim.tick dt
                 return anim
-                )
-        ]
-        anim.ref = frp.accum (new WalkAnimation player), (frp.mergeAll effects)
+            ]
         return anim.ref
 
 class Dash
     @mkBehavior: (tick, startDash, lookingDirection) ->
-        endDash = frp.onEventMakeEvent startDash, ((_) ->
-            return (frp.tickEvery tick, 200).once()
-            )
-
-        dashing = frp.hold false, (frp.mergeAll [
+        endDash = frp.onEventMakeEvent startDash, (_) -> (frp.timer tick, 200)
+        dashing = frp.holdAll false, [
             startDash.constMap true
             endDash.constMap false
-            ])
+            ]
 
-        dashMod = (tick.gate dashing).snapshot lookingDirection, ((dt, dir) -> (v) -> Vector.add v, (new Vector (dir*1500), 0))
+        dashMod = (tick.gate dashing).snapshot lookingDirection,
+            (dt, dir) -> (v) -> Vector.add v, (new Vector (dir*1500), 0)
         dashMod.dashing = dashing
         return dashMod
 
+# TODO refactor
 class Movement
     constructor: (@tick, @player) ->
-        @MAXSPEED = new Speed 300, 0
-        @BASESPEED = new Speed 300, 0
-
         startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
         stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
@@ -263,38 +236,32 @@ class Movement
 
         modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
             localTick = frp.tickUntilEvent @tick, stopMove.once()
-            # accel = frp.integrate localTick, 100, (frp.pure (5000))
-            # accel = accel.map ((a) -> lowerCap a, 0)
-            # accel = accel.map ((a) -> new Vector (direction.dir.x*a), 0)
-            #velocity = frp.integrate localTick, (new Vector (direction.dir.x*0), 0), accel, Vector.add, Vector.scalar
-            #velocity = velocity.map ((a) -> (old) -> Vector.add old, a)
-
             v = 100 * direction.dir.x
-            velocity = frp.hold ((old) -> Vector.add old, (new Vector v, 0)),
-                localTick.constMap ((old) -> Vector.add old, (new Vector v, 0))
-            return velocity.updates()
+            velocity = frp.hold (new Vector v, 0), (localTick.constMap (new Vector v, 0))
+            return velocity.values()
             )
 
         dirAtStopMove = frp.snapshot stopMove, direction, frp.second
         modVelocity2 = frp.onEventMakeEvent dirAtStopMove, ((direction) =>
             deaccelTime = 50
-            localTick3 = frp.tickFor @tick, deaccelTime
+            [localTick3, lastTick] = frp.tickSplitTime @tick, deaccelTime
+            lastTick = lastTick.once()
+
             velocity2 = frp.integrate localTick3, 1, (frp.pure -33)
-            velocity2 = velocity2.map ((v) -> (old) ->
-                return Vector.scalar (lowerCap v, 0), old
-                )
+            velocity2 = velocity2.map (v) -> new Vector (lowerCap v, 0), 0
 
-            lastTick = (frp.tickAfter @tick, deaccelTime).once()
-
-            effects = [
-                velocity2.updates()
-                lastTick.constMap (frp.constant Vector.null())
-            ]
-            return frp.mergeAll effects
+            return frp.mergeAll [
+                velocity2.values()
+                lastTick.constMap Vector.null()
+                ]
             )
-        bc = new BaseComponents @tick, 300, null, (frp.merge modVelocity1, modVelocity2)
-        value = bc.velocity
 
+        modVelocity1 = modVelocity1.map (fv) -> (old) ->
+            fv.x
+        modVelocity2 = modVelocity2.map (fv) -> (old) ->
+            fv.x
+        value_x = new Velocity @tick, (frp.merge modVelocity1, modVelocity2), 300, null, (frp.pure 0.9)
+        value = frp.hold (Vector.null()), (value_x.updates().map ((v) -> new Vector v, 0))
 
         sndPress = frp.onEventMakeBehavior false, startMove, ((_) ->
             return frp.hold true, ((frp.tickEvery tick, 100).once().constMap false)
@@ -342,8 +309,10 @@ class Movement
             value.updates().map ((v) -> (old) -> Vector.add old, v)
             fallV.updates().map ((v) -> (old) -> Vector.add old, v)
             wallJump.updates().map ((v) -> (old) -> Vector.add old, v)
-            frp.mapE (frp.updates @player.pushVel), ((v) -> (old) -> Vector.add old, v)
-            frp.mapE (frp.updates @player.pullVel), ((v) -> (old) -> Vector.add old, v)
+            frp.mapE (frp.updates @player.pushVel), ((v) ->
+                (old) -> Vector.add old, v)
+            frp.mapE (frp.updates @player.pullVel), ((v) ->
+                (old) -> Vector.add old, v)
             dash
             ])
 
@@ -351,25 +320,29 @@ lowerCap = (v, cap) -> if v < cap then return cap else v
 upperCap = (v, cap) -> if v > cap then return cap else v
 
 class BlockSetter
-    constructor: (@tick, @player) ->
+    constructor: (@tick, @setBlockEvent) ->
         blockSet = {ref:null} #new frp.EventStream
+        
+        blockpower = {ref:null}
 
         @MAXPOWER = 1000
         @BLOCKCOST = 200
         @MINPOWER = 0
 
-        refill = @tick.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
+        # we dont refill if we are full
+        full = frp.mapB blockpower, (power) => power >= @MAXPOWER
+        tick = @tick.gate (full.not())
+        refill = tick.map ((t) => ((v) => upperCap (v + t), @MAXPOWER))
 
-        effects = [
-                refill
-                frp.constMap blockSet, ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
+        # refill or remove power when setting
+        blockpower.ref = frp.accumAll 0, [
+            refill
+            frp.constMap blockSet, ((v) => lowerCap (v - @BLOCKCOST), @MINPOWER)
         ]
+        @blockpower = blockpower.ref
 
-        @blockpower = frp.accum 0, (frp.mergeAll effects)
         @canSetBlock = @blockpower.map ((v) => v > @BLOCKCOST)
-        #full.ref = @blockpower.map ((v) => v >= @MAXPOWER)
-
-        doSetBlock = @player.setBlockEvent.gate @canSetBlock
+        doSetBlock = @setBlockEvent.gate @canSetBlock
 
         blockSet.ref = doSetBlock.constMap true
         @blockSet = blockSet.ref
@@ -554,10 +527,6 @@ class Push
             pushEnd.constMap (Vector.null())
             ])
 
-        distance.updates().listen (log "Distance")
-        pushDuration.listen (log "push duration")
-        pushEnd.listen (log "Push end")
-    
         return pushVel
 
 follow = (@base, @follower) ->
@@ -605,3 +574,4 @@ module.exports =
     Push: Push
     Pull: Pull
     Vector: Vector
+    BlockSetter:BlockSetter

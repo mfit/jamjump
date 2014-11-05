@@ -1,0 +1,249 @@
+* Player
+** Event
+
+From user
+- moveEvent with Direction
+- jumpEvent
+- setBlockEvent
+
+From phaser (collision)
+- landedOnBlock
+- touchedWall
+  
+Additional
+- setPosition
+  
+* Collision box
+** Philosophy
+setActive with event as default construtor
+
+* General
+  
+** Events and Behaviors
+Events are occurrences of values
+Behaviors are time dependent values
+
+Both are containers for values i
+    (Behavior (a) is the behavior with value a)
+    (Event (a) is the event with value a)
+
+Behaviors always contain a value
+
+Values can also be functions, or behaviors or events...
+
+** Initialize events
+- new EventStream(): create a new stream
+- Event.send a: fire a into the stream
+
+** Combine events
+- listen e, f: 
+   call f when e fires
+   returns an unlistener 
+
+    e = new frp.EventStream()
+    unlistener = e.listen ((name) -> console.log "Hello #{name}")
+    frp.sync(-> e.send "World!")
+    >>> "Hello World!"
+  
+    unlistener()
+    frp.sync(-> e.send "John")
+    >>>
+
+- never: the event that never fires
+
+- merge e1, e2: merge two event streams into one
+    a = new frp.EventStream()
+    b = new frp.EventStream()
+    c = frp.sync (-> frp.merge a, b)
+    frp.sync (->
+        c.listen ((x) -> console.log x)
+        a.send ('a')
+        b.send ('b')
+        )
+    >>> a
+        b
+    
+- mergeAll [e]: merge all event streams into one
+- mapE e, f / e.map: modify the value inside the event if function f
+- constMap e, a / e.constMap a: replace the value inside the event with constant a
+- delay: put the event into the next transaction
+- filter e, f: filter the values of e by f (only fires when f returns true)
+
+- execute e(f): call the function inside the event when it fires and return its value wrapped in an event
+  type: Event (-> a) -> Event (a) - Event that holds a function to Event that holds the return value of that function
+  e.g.
+     a = new frp.EventStream()
+     b = new frp.EventStream()
+     frp.sync (-> 
+         c = a.execute()
+         c.listen ((x) -> console.log "c", x)
+         b.listen ((x) -> console.log "b", )
+  
+         a.send (-> 
+             b.send "Hello"
+             return "World"
+         )
+     >>> "b" "Hello"
+     >>> "c" "World"
+
+- split e([a]): put every event into its own transaction
+- coalesce e, f: if multiple firings of the event occured in one transaction, combine them with the function f
+    e.g.
+    mkUpdateEvent: ->
+        # convert value to list
+        e1 = mapE this, ((v) -> [v]) 
+        # append the lists
+        e2 = coalesce e1, ((as, bs) ->
+            for b in bs
+                as.push b
+            return as
+            )
+        # put every value into its own transaction
+        e3 = split e2
+        return e3
+  
+** Initialize behaviors
+pure a: Constant behavior with value a
+
+mapB/Behavior.map: Modifiy the value inside the behavior with given function
+
+apply b1, b2, f: Combine two behaviors using the function f
+    b1 = pure "Hello"
+    b2 = pure "World"
+    b = apply b1, b2, ((x, y) -> x + " " + y + "!")
+    >>> b holds "Hello World!"
+    
+    if b1 or b2 change value b gets updated
+
+** Interaction between behaviors and events
+hold initA, e: A behavior with initial value initA. Gets updated when e fires to the value inside e
+
+    Note: ignore the following two notes
+    Note: behavior updates are processed at the end of a transaction. If multiple firings occurred in
+    one transaction the behavior updates only once.
+    Note: but every firing is put into its own transaction for now
+
+    a = new frp.EventStream()
+    b = frp.hold 0, a
+    a.send 1
+    >>> b holds 1
+    
+accum initA, e(f): A behavior with initial value initA. Gets modified by the function inside e
+    a = new frp.EventStream()
+    b = frp.accum 0, a
+    a.send ((oldB) -> oldB + 10)
+    >>> b holds 10
+    
+gate e, b: an event that fires only when e fires and b's current value is true
+    
+updates b: Returns an event that is fired every time the behavior gets updated
+values b: Returns an event that is fired every time the behavior gets updated and once immediatly
+    updates (pure 0) will never fire
+    values (pure 1) will fire once with value 1
+   
+snapshot e, b, f: sample the behavior when e fires and combine it using f. Returns an event
+    a = new EventStream()
+    b = new EventStream()
+    beh = hold 0, b
+    c = snapshot a, beh, ((a, beh) -> a + beh)
+    a.send (5) # c fires with 5
+    b.send (10) # value of beh is 10
+    a.send (5) # c fires with 15
+
+*** Interesting stuff
+switchB: Given a behavior with behaviors as values returns the behavior inside it. Returns a behavior.
+    switchB (pure (pure 1)) == pure 1
+    
+    a = new EventStream()
+
+    e = new EventStream()
+    b = switchB (hold (pure 0), e) (value of b) == 0
+    e.send (pure 1) # (value of b) == 1
+    e.send (hold (pure 0), a) # (value of b) == 0
+    a.send 2 # (value of b) == 2
+    
+switchE: Given a behavior with events as values returns the event inside it. (Returns an event)
+    # create event on event
+    # returns an event
+    onEventMakeEvent = (e, callback) ->
+        # v is a behavior of events
+        v = hold never, (execute (e.map ((v) -> -> callback v))) 
+        return switchE v
+        
+    e = onEventMakeEvent startMove, ((movingDirection) ->
+        return timer tick, 1000)
+    # e is an event that fires 1000ms after startMove fired
+    # if startMove fires again before 1000ms passed the event will be replaced and does not fire!
+        
+** Time
+tick: every ~16ms game state gets updated
+    used for timers etc.
+    should not be global
+    
+    # since tick is not global every component inside the player uses the new tick
+    # -> player moves, jumps etc. twice as fast
+    player = new Player (tick.map ((dt) -> 2 * dt))
+    
+    # time advances for player1 only when player2 is moving
+    # braid
+    # http://superhotgame.com/play-prototype
+    player1CanMove = player2.movement.isMoving
+    player1 = new Player (tick.gate player1CanMove)
+    
+*** Tick modifiers
+    tickEvery tick, time: tick every 'time' ms with tick as stepper
+    tickAfter tick, time: start to tick after 'time' ms
+    tickFor tick, time: tick for 'time' ms
+    timer tick, time: tick once after 'time' ms 
+    timer tick, time = (tickEvery tick, time).once()
+    
+    tickAfterEvent tick, event: tick after event occurred
+    
+    t = tickAfter tick, 100
+    t2 = tickFor t, 100
+    # t2 ticks for 100 ms after 100ms
+
+** Notes
+   
+*** Recursion
+e = {ref:null}
+frp.hold 0, e
+
+later:
+e.ref = some derived event
+
+but
+e.map(f), e.constMap(f) etc. does not work :(
+use frp.mapE e, f
+
+**** TODO
+e = new LaterEvent()
+and define methods on LaterEvent?
+
+    
+*** Behavior updates
+Behaviors are updated at the end of a transaction (=sync) 
+
+    ea = @tick.constMap 1
+    eb = @tick.constMap 2
+    ba = frp.hold 0, ea
+
+    ec = eb.snapshot ba, ((a, b) -> a + b)
+    # returns 2 after first tick because ba has value 0 during the transaction
+    ec.listen (log "ec") 
+
+    ----
+
+    ea = @tick.constMap 1
+    eb = @tick.constMap 2
+    ba = frp.hold 0, ea
+
+    ec = eb.delay().snapshot ba, ((a, b) -> a + b)
+    # eb.delay() creates an event that is triggered after the behaviors update
+    # returns 3 after first tick
+    ec.listen (log "ec") 
+
+** Ticks
+preTick (to handle collisions)
+tick (to handle game state)
+postTick (to update phaser state)

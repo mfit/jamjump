@@ -1,3 +1,4 @@
+PIXI = require '../stubs.js'
 class TestFilter extends PIXI.AbstractFilter
     constructor: (r, g, b, a=1) ->
         PIXI.AbstractFilter.call this

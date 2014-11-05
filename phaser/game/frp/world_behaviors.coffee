@@ -236,6 +236,12 @@ class World
     constructor: (game) ->
         @tick = tick
 
+        # FIXME doesnt work :/
+        # e = frp.onEventCollectEvent @tick, ((dt) ->
+        #     return frp.tickEvery tick, 40
+        #     )
+        # e.listen (log "SHOULD FIRE")
+
         @makeFaster = new frp.EventStream()
         @makeSlower = new frp.EventStream()
         @mod = frp.accum 1, (frp.mergeAll [
@@ -246,15 +252,18 @@ class World
         playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
             new player.Player game, playerTick, "p1", 'runner1'
-            new player.Player game, playerTick, "p2", 'runner2'
+            #new player.Player game, playerTick, "p2", 'runner2'
          #   new player.Player game, "p3"
         ]
 
-        @players[0].pushVel.ref = frp.pure (player.Vector.null());
-        @players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].jumpEvent
+        # TODO move this inside the player
+        @players[0].pushVel.ref = frp.pure (player.Vector.null())
+        # @players[1].pushVel.ref = frp.pure (player.Vector.null());
+        # @players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].jumpEvent
 
-        @players[0].pullVel.ref = new player.Pull @tick, @players[1], @players[0], @players[1].jumpEvent
-        @players[1].pullVel.ref = frp.pure (player.Vector.null());
+        # @players[0].pullVel.ref = new player.Pull @tick, @players[1], @players[0], @players[1].jumpEvent
+        # @players[1].pullVel.ref = frp.pure (player.Vector.null());
+        @players[0].pullVel.ref = frp.pure (player.Vector.null());
 
         #@players[0].pushBox.addColliders.send (@players[1])
     

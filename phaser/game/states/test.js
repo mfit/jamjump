@@ -37,7 +37,7 @@ TestState.prototype = {
         this.game.world.height = 5000;
 
         this.frpPlayer = this.frpWorld.players[0];
-        this.otherFrpPlayer = this.frpWorld.players[1];
+        this.otherFrpPlayer = this.frpWorld.players[0];
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
@@ -56,7 +56,6 @@ TestState.prototype = {
         this.game.rootGroup.add(this.frpWorld.particles.group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
             this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
-            this.game.rootGroup.add(this.frpWorld.players[i].dbg);
         }
 
 
@@ -176,8 +175,8 @@ TestState.prototype = {
       for (var i = 0; i < this.frpWorld.players.length; i++) {
             var x = function (i) { 
                 playerEvents.push (function() {
-                    that.frpWorld.players[i].setPosition(new b.Direction (
-                    that.frpWorld.players[i].sprite.body.x, that.frpWorld.players[i].sprite.body.y));
+                    that.frpWorld.players[i].setPosition.send(new b.Direction (
+                        that.frpWorld.players[i].sprite.body.x, that.frpWorld.players[i].sprite.body.y));
             }); }
             x(i);
       }
@@ -318,6 +317,7 @@ TestState.prototype = {
 
       // update stuff
       var that = this;
+      console.log("pretick")
       frp.sync(function() {b.preTick.send(that.game.time.elapsed)});
       // update tick
       for (var index in playerEvents) {
@@ -329,8 +329,10 @@ TestState.prototype = {
       playerEvents = []
       this.playerEvents = []
 
+      console.log("tick")
       frp.sync(function() {b.tick.send(that.game.time.elapsed)});
 
+      console.log("posttick")
       frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
 
       //

@@ -56,7 +56,7 @@ module.exports = function (grunt) {
           src: ['**/*.coffee'],
           dest: 'game/',
           ext: '.js'
-        }
+        },
     },
     subgrunt: {
         phaser: {
@@ -70,6 +70,7 @@ module.exports = function (grunt) {
             'game/**/*.js',
             'game/**/*.coffee',
             'game/**/*/*.js',
+            'spec/**/*/*.coffee',
             'assets/levels/*.txt',
             'assets/levels/*.json',
             '!game/main.js'
@@ -112,6 +113,7 @@ module.exports = function (grunt) {
           { expand: true, flatten: true, src: ['phaser/dist/*.js'], dest: 'dist/js/' },
           { expand: true, flatten: true, src: ['bower_components/**/dist/*.js'], dest: 'dist/js/' },
           { expand: true, src: ['css/**'], dest: 'dist/' },
+          { expand: true, src: ['jasmine/**'], dest: 'dist/' },
           { expand: true, src: ['index.html'], dest: 'dist/' }
         ]
       }

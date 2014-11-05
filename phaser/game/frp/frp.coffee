@@ -34,6 +34,12 @@ class EventStream
             dep: dep
         return [ev, push, node]
 
+    @newEventImpl2: () ->
+        node = new Node()
+        obs = new Observer()
+        listen = new Listen null, null, obs, node
+        return [listen, obs, node]
+
     @newEventImpl: ->
         node = new Node()
         obs = new Observer()
@@ -111,16 +117,21 @@ class EventStream
     snapshotEffect: (beh, callback) ->
         e = @snapshot beh, callback
         e.listen ((v) ->)
+    delay: -> delay this
+    execute: -> execute this
 
     times: (a) -> @map ((v) -> v * a)
 
     mkUpdateEvent: ->
+        # convert value to list
         e1 = mapE this, ((v) -> [v]) 
+        # append the lists
         e2 = coalesce e1, ((as, bs) ->
             for b in bs
                 as.push b
             return as
             )
+        # put every value into its own transaction
         e3 = split e2
         return e3
 
@@ -198,15 +209,39 @@ class Unlistener
     constructor: (@unlisten) ->
 
 class Listen
-    constructor: (@callback, @keepAlive) ->
+    constructor: (@callb=null, @keepAlive, @obs, @node) ->
         @takeDowns = []
         @listeners = 0
+        if @callb != null
+            @callback = @callb
+            
+    callback: (target, suppressEarlierFirings, handle) ->
+        @listeners += 1
+        id = @obs.mkId()
+        @obs.listeners[id] = handle
+
+        #return (unlisten, id)
+        modified = if target != null then @node.link id, target else false
+        if not suppressEarlierFirings
+            for firing in @obs.firings
+                handle firing
+        return (@unlisten id)
+
+    unlisten: (id) => =>
+        delete @obs.listeners[id]
+        @listeners -= 1
+        if @destroy
+            @destroy()
+        @node.unlink id           
+
     destroy: () ->
         if @listeners >= 2
             debug "Many listeners", this
         if @listeners == 0
             for takeDown in @takeDowns
                 takeDown()
+
+    
 
 class Observer
     constructor: ->
@@ -218,6 +253,16 @@ class Observer
         id = @next_id
         @next_id += 1
         return id
+
+    push: (a) ->
+        if system.syncing == false
+            console.warn "event sent outside sync"
+
+        @firings.push a
+        system.final.push (=> @firings = [])
+
+        for listenId, listenCallback of @listeners
+            listenCallback a
 
 class Node
     constructor: ->
@@ -336,6 +381,15 @@ class System
                 @post.shift()
                 task()
                 continue
+
+            if @delay.length != 0
+                task = @delay[0]
+                @delay.shift()
+                task()
+                # for del in @delay
+                #     @queue1.push del
+                # @delay = []
+                continue
             return
         return
 
@@ -349,6 +403,7 @@ class System
         @queue2 = new PriorityQueue
         @final = []
         @post = []
+        @delay = []
 
         @taskLoop()
         
@@ -369,11 +424,11 @@ system = new System()
 filterJust = (ea) ->
     e = null
     gl = ->
-        [l, push, node] = EventStream.newEventImpl()
+        [l, obs, node] = EventStream.newEventImpl2()
         unlistener = later (->
             debug "linking filterJust #{e.getName()} to #{ea.getName()}"
             unlisten = ea.linkedListen node, false, ((b) ->
-                if isJust b then push (b.value)
+                if isJust b then obs.push (b.value)
             )
             return (->
                 debug "unlistening filterJust #{e.getName()} from #{ea.getName()}"
@@ -608,7 +663,7 @@ values = (ba) ->
     sa = ba.sample
     ea = updates ba
     e = eventify ((node, suppress, handle) -> listenValueRaw ba, node, suppress, handle), ([sa, ea])
-    e.name "values of #{ba.getName()}"
+    e.name = "values of #{ba.getName()}"
     return e
 
 updates = (beh) ->
@@ -626,8 +681,11 @@ updates = (beh) ->
 class KeepAlive
     constructor: ->
 
+holdAll = (initA, eas) -> hold initA, (mergeAll eas)
+accumAll = (initA, eas) -> accum initA, (mergeAll eas)
+
 hold = (initA, ea) ->
-    ea = ea.mkUpdateEvent()
+    ea = ea
     bs = new BehaviorState initA, new Nothing()
     b = null
 
@@ -637,7 +695,9 @@ hold = (initA, ea) ->
         [l, push, node] = EventStream.newEventImpl()
         unlistener = later (->
             unlist = ea.linkedListen node, false, ((a) ->
-                push a)
+                system.scheduleLast (->
+                    push a
+                ))
             return (->
                unlist()
                if behUn.unlisten != null
@@ -935,6 +995,18 @@ once = (e) ->
     newEvent.name = 'once'
     return newEvent
 
+delay = (e) ->
+    gl = ->
+        [l, push, node] = EventStream.newEventImpl()
+        unlistener = later (->
+            e.linkedListen node, false, ((a) ->
+                system.delay.push (-> push a)
+                )
+            )
+        addCleanup_Listen unlistener, l
+    newEvent = new EventStream gl, null, e
+    return newEvent
+
 accum = (z, efa) ->
     efa = efa.mkUpdateEvent()
     s = {ref:null}
@@ -1064,6 +1136,9 @@ tickAfterEvent = (baseTick, event) ->
     occurred = happened event
     return baseTick.gate occurred
 
+tickSplitTime = (baseTick, time) ->
+    return [(tickFor baseTick, time), (tickAfter baseTick, time)]
+
 # tickEvery = (baseTick, time) ->
 #     reset = {ref:null}
 #     ticker = accum 0, (mergeAll [
@@ -1072,16 +1147,27 @@ tickAfterEvent = (baseTick, event) ->
 #         ])
 #     reset.ref = fr
 
+onEventCollectEvent = (e, callback) ->
+    v = accum never, (execute (e.map ((v) -> ->
+        r = callback v
+        return (oldE) -> merge oldE, r
+        )))
+    return switchE v
+
 # create event on event
 # returns an event
 onEventMakeEvent = (e, callback) ->
     v = hold never, (execute (e.map ((v) -> -> callback v)))
     return switchE v
 
+# create a behavior on event
+# returns a behavior
 onEventMakeBehavior = (initial, e, callback) ->
     v = hold (pure initial), execute e.map ((v) -> -> callback v)
     return switchB v
 
+# [Behavior a] -> Behavior [a]
+# converts a list of behaviors to a behavior of a list
 collectBehs = (behs) ->
     new_behs = []
     for beh in behs
@@ -1100,27 +1186,29 @@ collectBehs = (behs) ->
             )
     return first_b
 
+# 
 onEventMakeBehaviors = (initials, e, callback) ->
     e2 = execute e.map ((v) -> ->
         behs = callback v
         return collectBehs behs
         )
     v = hold (pure initials), e2
-    (updates v).listen (log "VVVVVVVVVVVV")
-    (e2).listen (log "EEEEEEEEEE")
     return switchB v   
 
-integrate = (dt, x, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
+# integrate f(t)dt with constant C and f(t) = dx
+integrate = (dt, C, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
     diff = dt.snapshot dx, ((dt, dx) -> (oldX) -> add oldX, (scalar (dt / 1000.0), dx))
-    b = accum x, diff
+    b = accum C, diff
     b.name = [b.name, "accum, integrate"]
     return b
 
-integrateB = (dt, bx, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
+# integrate f(t)dt with constant C(t) and f(t) = dx
+integrateB = (dt, C, dx, add=((x, y) -> x + y), scalar=(t, x) -> t * x) ->
     diff = dt.snapshot dx, ((dt, dx) -> scalar (dt / 1000.0), dx)
-    b = diff.snapshot bx, ((d, b) -> add d, b)
+    b = diff.snapshot C, ((d, b) -> add d, b)
     return hold 0, b
 
+# a behavior that is true when e triggerd and false otherwise
 happened = (e) ->
     h = e.once().constMap true
     h.name = [h.name, "onceHappened"]
@@ -1136,48 +1224,57 @@ module.exports =
         beh.update = e.send
         return beh
     #mergeAll: (es) -> (mergeAll es).mkUpdateEvent()
+    merge: merge
+    never:never
     mergeAll: mergeAll
+    constMap:constMap
+    mapE:mapE
+    filter:filter
+    filterTrue:filterTrue
+    delay:delay
+
+    updates:updates
+    values:values
     accum:accum
     hold:hold
     apply:apply
     switchBeh:switchB
     switchB:switchB
-    updates:updates
-    values:values
     switchE:switchE
     #merge: (e1, e2) -> (merge e1, e2).mkUpdateEvent()
-    merge: merge
-    never:never
     execute:execute
     pure:pure
-    constMap:constMap
-    mapE:mapE
+
     sync: (f) ->
         system.sync f
+
     tick:tick
     preTick:preTick
     postTick:postTick
+
     selector:selector
     inc:inc
     dec:dec
     constant:constant
     log:log
+
     mkCountdown:mkCountdown
     tickFor:tickFor
     tickAfter:tickAfter
     tickUntilEvent:tickUntilEvent
     tickAfterEvent:tickAfterEvent
     onEventMakeEvent:onEventMakeEvent
+    onEventCollectEvent:onEventCollectEvent
     onEventMakeBehavior:onEventMakeBehavior
     integrate:integrate
     integrateB:integrateB
     onEventMakeBehaviors:onEventMakeBehaviors 
     happened:happened
-    filter:filter
-    filterTrue:filterTrue
     second:second
     snapshot:snapshot
     timer:timer
     tickEvery:tickEvery
-    mapE:mapE
     mapB:mapB
+    tickSplitTime:tickSplitTime
+    holdAll:holdAll
+    accumAll:accumAll
