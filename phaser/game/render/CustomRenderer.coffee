@@ -235,7 +235,115 @@ class BufferManager
 render = (gl) ->
     return
 
+class LineShader
+    constructor: (gl) ->
+        @program = PIXI.compileProgram gl, [
+            'attribute vec2 vertexPosition;'
+            'attribute float speed;'
+            'uniform float angle;'
+            'uniform float time;'
+
+            'void main(void) {'
+            '    float y = sin(angle)*vertexPosition.y; '
+                'float newX = 0.0;'
+                'float offset = 0.0;'
+                'offset = mod (-time*speed, -2.0)+1.1;'
+                'newX += sin(angle)*(offset + vertexPosition.y);'
+            '    gl_Position = vec4(newX + vertexPosition.x, offset + vertexPosition.y, 0, 1);'
+            '}'
+            ], [
+            'void main(void) {'
+            '    gl_FragColor = vec4(6.0/255.0, 84.0/255.0, 133.0/255.0, 1);'
+            '}'
+            ] 
+
+class LineRenderer
+    constructor: (@gl) ->
+        gl = @gl
+        @vertexBuffer = gl.createBuffer()
+        @indexBuffer = gl.createBuffer()
+        @shader = new LineShader @gl
+
+    upload: ->
+        gl = @gl
+
+        @num = 5000
+        elementData = [0..@num*2]
+        @vertexData = []
+        for i in [0..(@num)]
+            x = ((2 * (Math.random()-0.5)))
+            y = ((2 * Math.random()-0.5))
+            speed = (Math.random() + 5)*20 - 85
+            @vertexData.push x
+            @vertexData.push 0
+            @vertexData.push speed
+            @vertexData.push x
+            @vertexData.push -((Math.random() + 0.5)/10.0)
+            @vertexData.push speed
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bufferData gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(elementData), gl.STATIC_DRAW
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+        gl.bufferData gl.ARRAY_BUFFER, new Float32Array(@vertexData), gl.STATIC_DRAW
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+
+        gl.useProgram @shader.program
+        @vertexPos = gl.getAttribLocation @shader.program, 'vertexPosition'
+        @speed = gl.getAttribLocation @shader.program, 'speed'
+        @angleUniform = gl.getUniformLocation @shader.program, 'angle'
+        @time = gl.getUniformLocation @shader.program, 'time'
+
+        # restore state
+        gl.useProgram oldProg
+
+        @angle = 0
+        @localTime = 0
+        @pos = [0, 0.3, 0.5]
+
+    render: ->
+        gl = @gl
+        gl.viewport 0, 0, 1920, 600
+        gl.disable gl.BLEND
+        gl.disable gl.DEPTH_TEST
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+        gl.useProgram @shader.program
+        gl.vertexAttribPointer @vertexPos, 2, gl.FLOAT, false, 12, 0
+        gl.vertexAttribPointer @speed, 1, gl.FLOAT, false, 12, 8
+        gl.enableVertexAttribArray @vertexPos
+
+        @localTime += 0.0016*1
+        @angle = Math.sin(@localTime) / 10.0
+
+        for i in [0..3]
+            @pos[i] -= (0.016*i)
+            if @pos[i] < -3
+                @pos[i] = 3
+
+
+        gl.uniform1f @angleUniform, @angle
+        gl.uniform1f @time, @localTime
+
+        gl.lineWidth 1
+        gl.drawElements gl.LINES, @num, gl.UNSIGNED_SHORT, 0
+
+        gl.enable gl.BLEND
+        #gl.enable gl.DEPTH_TEST
+
+        # restore state
+        gl.useProgram oldProg
+
+init = (gl) ->
+    Phaser.TextureManager = new TextureManager gl
+    Phaser.TextureManager.markUnitUsed gl.TEXTURE0
+
 module.exports =
-    TextureManager:TextureManager
+    init:init
+#    TextureManager:TextureManager
     BufferManager:BufferManager
+    LineRenderer:LineRenderer
     

@@ -9,6 +9,8 @@ var input = require('../model/input.js');
 
 var toPhaser = require ('../frp/toPhaser.js');
 
+var ru = require ('../render/RenderUnit.js');
+
 var tick = frp.tick
 
 function TestState() {}
@@ -79,6 +81,7 @@ TestState.prototype = {
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
+        this.game.rootGroup.add(new ru.RenderUnit (this.game));
         // this.game.rootGroup.add(background3);
         // this.game.rootGroup.add(background2);
         // this.game.rootGroup.add(background1);

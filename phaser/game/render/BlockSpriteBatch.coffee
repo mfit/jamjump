@@ -86,9 +86,6 @@ BlockSpriteBatch::_renderWebGL = (renderSession) ->
 
 
 BlockSpriteBatch::initWebGL = (gl) ->
-    @tm = new renderer.TextureManager gl
-    @tm.markUnitUsed gl.TEXTURE0
-    @tm_texture_hack = false
     currentProg = gl.getParameter gl.CURRENT_PROGRAM
     shader = new BlockShader gl
     gl.useProgram currentProg
