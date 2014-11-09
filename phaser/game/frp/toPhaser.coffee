@@ -20,16 +20,15 @@ setup = (@game, world) ->
         setupPlayer player, @game
         s = preTick.onTickDo world.worldBlocks, (((player) => (blockManager) =>
             game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
-               if group_sprite.body.touching.up == true
-                   group_sprite.block.touchEvent.send true
-               if sprite.body.touching.down == true
-                   player.landedOnBlock.send true
+                if group_sprite.body.touching.up == true
+                    group_sprite.block.touchEvent.send true
+                if sprite.body.touching.down == true
+                    player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
 
-               if sprite.body.touching.left == true 
-                   player.touchedWall.send (-1)
-               if sprite.body.touching.right == true
-                   player.touchedWall.send 1
-
+                if sprite.body.touching.left == true 
+                    player.touchedWall.send (-1)
+                if sprite.body.touching.right == true
+                    player.touchedWall.send 1
             ) player)
        # side effects
        s.listen ((v) ->)
@@ -152,19 +151,14 @@ class ParticleGroup
             {r:210/255.0, g:105/255.0, b:30/255.0, a:1}
         @group2 = new render.ColorSpriteBatch game,
             {r:205/255.0, g:133/255.0, b:63/255.0, a:1}
-        console.log @group1
 
         @group.add @group1
         @group.add @group2
-
-        console.log @group1
-        console.log @group2
-        console.log @group
         # gl = @group1.fastSpriteBatch.gl
 
         inners = []
         outers = []
-        for i in [0..500]
+        for i in [0..200]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
             inners.push innerGlow
@@ -175,6 +169,8 @@ class ParticleGroup
 
             inners[i].speed = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
             inners[i].pos = {x:(Math.random()-0.5)*200, y:(Math.random()-0.5)*200}
+            outers[i].s = Math.random() * 3.14
+            outers[i].s2 = Math.random() * 3.14
 
             @group1.addChild outerGlow
             @group2.addChild innerGlow
@@ -195,7 +191,9 @@ class ParticleGroup
                 inners[i].y = inners[i].pos.y
                 outers[i].x = inners[i].pos.x - 1
                 outers[i].y = inners[i].pos.y - 2
-                outers[i].scale.set (2 + (Math.random())*5), (2 + (Math.random())*5)
+                outers[i].s += dt*10
+                outers[i].s2 += dt*8
+                outers[i].scale.set (2 + (Math.sin(outers[i].s))*5), (2 + (Math.sin(outers[i].s2))*5)
             )
 
 setupPlayer = (player, game) ->
@@ -216,13 +214,13 @@ setupPlayer = (player, game) ->
     setupMovement player, player.movement
 
     t = postTick.snapshotMany [player.movement, player.pushBox.movement], ((t, speed, boxSpeed) =>
+        console.log player.sprite.y
         player.sprite.body.velocity.x = speed.x
         player.sprite.body.velocity.y = speed.y
         )
     t.listen ((v) ->)
 
 setupMovement = (player, movement) ->
-    console.log movement
     movement.walkAnim = WalkAnimation.mkBehavior player, tick, movement.startMove, movement.stopMove
     movement.direction.updates().listen ((dir) =>
         player.sprite.scale.set (-dir.x), 1

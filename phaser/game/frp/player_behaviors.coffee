@@ -5,6 +5,9 @@ log = frp.log
 preTick = frp.preTick
 postTick = frp.postTick
 
+BLOCKWIDTH = 50
+BLOCKHEIGHT = 50
+
 class Player
     constructor: (@tick, @name="p", @spriteKey="runner1") ->
         @moveEvent = new frp.EventStream "MoveEvent"
@@ -120,93 +123,79 @@ class Dash
 # TODO refactor
 class Movement
     constructor: (@tick, @player) ->
-        startMove = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
-        stopMove = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
+        wantsMoveEvent = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
+        wantsStopMoveEvent = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
-        direction = frp.hold Direction.null(), (startMove.map ((e) -> e.dir))
-        @direction = direction
+        direction_Wanted = frp.hold Direction.null(), (wantsMoveEvent.map ((e) -> e))
+        directionWanted = frp.hold Direction.null(), (wantsMoveEvent.map ((e) -> e.dir))
+        @direction = directionWanted
+
+        wantsMove = frp.holdAll false, [
+            wantsMoveEvent.constMap true
+            wantsStopMoveEvent.constMap false
+            ]
+
+        moveAfterJump = (player.landedOnBlock.gate wantsMove).snapshot direction_Wanted, (_, dir) -> dir
+
+        startMove = frp.merge wantsMoveEvent, moveAfterJump
+
+        jumping = frp.holdAll false, [
+            @player.jumpEvent.constMap true
+            @player.landedOnBlock.constMap false
+        ]
+
+        canStartMove = startMove.gate (jumping.not())
+
+        @speed = 300
+
+        running = frp.holdAll false, [
+            canStartMove.constMap true
+            stopMove.constMap false
+            ]
+
+        moving = frp.apply running, jumping, (bMov, bJump) ->
+            bMov and (not bJump)
         
-        modVelocity1 = frp.onEventMakeEvent startMove, ((direction) =>
-            localTick = frp.tickUntilEvent @tick, stopMove.once()
-            v = 100 * direction.dir.x
-            velocity = frp.hold (new Vector v, 0), (localTick.constMap (new Vector v, 0))
-            return velocity.values()
-            )
+        velXmods = frp.mergeAll [
+            startMove.map (dir) ->
+                (oldV) -> dir.dir.x * 300
+            ]
 
-        dirAtStopMove = frp.snapshot stopMove, direction, frp.second
-        modVelocity2 = frp.onEventMakeEvent dirAtStopMove, ((direction) =>
-            deaccelTime = 50
-            [localTick3, lastTick] = frp.tickSplitTime @tick, deaccelTime
-            lastTick = lastTick.once()
+        runForce = null #new Force @tick, frp.never, 0, 0
 
-            velocity2 = frp.integrate localTick3, 1, (frp.pure -33)
-            velocity2 = velocity2.map (v) -> new Vector (lowerCap v, 0), 0
+        drag = frp.apply moving, jumping, (bMov, bJump) ->
+            if bMov
+                0
+            else if bJump
+                0.5
+            else
+                16
+    
+        vel = new Velocity @tick, velXmods, 1000, runForce, drag
+        value = vel.map ((v) -> new Vector v, 0)
 
-            return frp.mergeAll [
-                velocity2.values()
-                lastTick.constMap Vector.null()
-                ]
-            )
-
-        modVelocity1 = modVelocity1.map (fv) -> (old) ->
-            fv.x
-        modVelocity2 = modVelocity2.map (fv) -> (old) ->
-            fv.x
-        value_x = new Velocity @tick, (frp.merge modVelocity1, modVelocity2), 300, null, (frp.pure 0.9)
-        value = frp.hold (Vector.null()), (value_x.updates().map ((v) -> new Vector v, 0))
-
-        sndPress = frp.onEventMakeBehavior false, startMove, ((_) ->
-            return frp.hold true, ((frp.tickEvery tick, 100).once().constMap false)
-            )
-        startDash = startMove.gate sndPress
-        dash = Dash.mkBehavior @tick, startDash, (direction.map ((dir) -> dir.x))
-
-
-        standing = frp.onEventMakeBehavior false, @player.landedOnBlock, ((_) =>
-            end = frp.timer preTick, 64
-            return frp.hold true, (end.constMap false)
-            )
-
-        resetVel = standing.updates().filterTrue().map ((standing) -> return (oldV) -> 0)
+        resetVel = @player.landedOnBlock.map (v) ->
+            (oldV) -> v
 
         jumping = @player.jumping
         jump = jumping.value.map ((v) -> (old) ->
             old + v)
 
-        wallJump1 = jumping.value2.map ((v) -> (_) ->
-            v.x)
-        wallJump2 = jumping.value2.map ((v) ->
-            (_) -> v.y)
-
         mods = frp.merge resetVel, jump
+
     
-        gravTick = @tick.gate (dash.dashing.not())
+        gravTick = @tick #@tick.gate (dash.dashing.not())
         
         gravity = new Force gravTick, frp.never, 1050, 1050
-        gravVel = new Velocity gravTick, mods, 1050, gravity
+        gravVel = new Velocity gravTick, mods, 2000, gravity
         fallV = frp.hold (Vector.null()), (gravVel.updates().map ((v) -> new Vector 0, v))
 
-        wallJumpGrav = new Velocity gravTick, (frp.merge wallJump2, resetVel), 1050, gravity
-        wallJumpFrac = new Velocity @tick, wallJump1, 1050, null, (frp.pure 0.9)
-        wallJump = frp.hold (Vector.null()), (frp.mergeAll [
-            wallJumpGrav.updates().map ((v) -> new Vector 0, v)
-            wallJumpFrac.updates().map ((v) -> new Vector v, 0)
-            ])
+        fallV.updates().listen (log "fallV")
 
         @player.pushVel = {ref:null}
         @player.pullVel = {ref:null}
 
-        @value = frp.accum (Vector.null()), (frp.mergeAll [
-            preTick.constMap (frp.constant (Vector.null()))
-            value.updates().map ((v) -> (old) -> Vector.add old, v)
-            fallV.updates().map ((v) -> (old) -> Vector.add old, v)
-            wallJump.updates().map ((v) -> (old) -> Vector.add old, v)
-            frp.mapE (frp.updates @player.pushVel), ((v) ->
-                (old) -> Vector.add old, v)
-            frp.mapE (frp.updates @player.pullVel), ((v) ->
-                (old) -> Vector.add old, v)
-            dash
-            ])
+        @value = frp.apply value, fallV, (x, y) -> Vector.add x, y
         # FIXME
         @value.direction = @direction
         @value.startMove = startMove
@@ -253,8 +242,9 @@ class Jumping
             @player.jumpEvent
         ]
 
-        @JUMPFORCE = -800
-        @MAX_JUMPS = 3
+        t = 1
+        @JUMPFORCE = (-200/t + -1050 * t / 2)
+        @MAX_JUMPS = 1
 
         @jumpsSinceLand = frp.accum 0, (frp.mergeAll [
                 (@player.jumpEvent.constMap frp.inc)
@@ -334,7 +324,7 @@ class Velocity
         if drag != null
             intForce.ref = frp.snapshot @tick, intForce.ref, ((dt, v) -> [v, dt])
             intForce.ref = frp.hold 0, (frp.snapshot intForce.ref, drag, (([v, dt], drag) ->
-                v*(drag*(1 - dt/1000.0))))
+                v*(1 - drag*dt/1000.0)))
         return velocity
 
 pullStrength = 3

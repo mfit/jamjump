@@ -5,6 +5,7 @@ var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
 var player = require('../frp/player_behaviors.js');
 var b = require('../frp/world_behaviors.js');
+var input = require('../model/input.js');
 
 var toPhaser = require ('../frp/toPhaser.js');
 
@@ -36,12 +37,29 @@ TestState.prototype = {
         var that = this;
         this.frpWorld = frp.sync(function () {return new b.World(that.game); });
         frp.sync(function() {toPhaser.setup(that.game, that.frpWorld);});
+      
+        this.input = new input.Input(this.game);
         
         this.game.world.width = 20000;
         this.game.world.height = 5000;
 
         this.frpPlayer = this.frpWorld.players[0];
         this.otherFrpPlayer = this.frpWorld.players[0];
+
+        this.keyboardInput = new input.KeyboardInput({
+            moveLeftDown:this.input.keyDownEvent['A'],
+            moveLeftUp:this.input.keyUpEvent['A'],
+            moveRightDown:this.input.keyDownEvent['D'],
+            moveRightUp:this.input.keyUpEvent['D'],
+            jumpDown:this.input.keyDownEvent['W'],
+            jumpUp:this.input.keyUpEvent['W'],
+            }, {
+            move: this.frpPlayer.moveEvent,
+            jump: this.frpPlayer.jumpEvent,
+            });
+      
+        frp.sync(function() {that.keyboardInput.mkBehaviors();});
+
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
@@ -94,7 +112,6 @@ TestState.prototype = {
         var step = 5;
         k1.onDown.add (function() {
             this.r += step;
-            console.log (this.r, this.g, this.b)
         }, this);
         k2.onDown.add (function() {
             this.r -= step;
@@ -159,11 +176,9 @@ TestState.prototype = {
 
              var that = this;
              playerEvents.push (function() {
-                console.log ("Send stop move")
                 that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
                 });         
              playerEvents.push (function() {
-                console.log ("Send stop move")
                 that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
                  that.moving = false;
                  that.moving2 = false;
@@ -186,19 +201,6 @@ TestState.prototype = {
       }
 
 
-      if (keyboard.isDown(Phaser.Keyboard.P)) {
-          console.log("Player", this.frpPlayer);
-      }
-
-      if (!this.jumpDown && this.game.input.keyboard.isDown(Phaser.Keyboard.W)) {
-          playerEvents.push (function() {
-              that.frpPlayer.jumpEvent.send(true);
-              });
-          this.jumpDown = true;
-      } else if (this.jumpDown && !keyboard.isDown(Phaser.Keyboard.W)) {
-          this.jumpDown = false;
-      }
-
       if (this.game.input.keyboard.isDown(Phaser.Keyboard.S)) {
           playerEvents.push (function() {
               that.frpPlayer.setBlockEvent.send(true);
@@ -219,44 +221,9 @@ TestState.prototype = {
               });
       }
 
-
-      if (this.moving !== -1 && keyboard.isDown(Phaser.Keyboard.A) && !keyboard.isDown(Phaser.Keyboard.D)) {
-          if (this.moving !== 0) {
-            playerEvents.push (function() {
-                console.log ("Send stop move")
-                that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
-                });
-          }
-          playerEvents.push (function() {
-              that.frpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
-              });
-
-              this.moving = -1;
-      }
-      if (this.moving !== 1 && !keyboard.isDown(Phaser.Keyboard.A) && keyboard.isDown(Phaser.Keyboard.D)) {
-          if (this.moving !== 0) {
-            playerEvents.push (function() {
-                console.log ("Send stop move")
-                that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
-                });
-          }
-          playerEvents.push (function() {
-            that.frpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
-            });
-          this.moving = 1;
-      }
-
-      if (this.moving !== 0 && !(keyboard.isDown(Phaser.Keyboard.A) || keyboard.isDown(Phaser.Keyboard.D))) {
-          this.moving = 0;
-          playerEvents.push (function() {
-              console.log ("Send stop move")
-              that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
-              });
-      }
       if (this.moving2 !== -1 && keyboard.isDown(Phaser.Keyboard.H) && !keyboard.isDown(Phaser.Keyboard.L)) {
           if (this.moving2 !== 0) {
             playerEvents.push (function() {
-                console.log ("Send stop move")
                 that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
                 });
           }
@@ -269,7 +236,6 @@ TestState.prototype = {
       if (this.moving2 !== 1 && !keyboard.isDown(Phaser.Keyboard.H) && keyboard.isDown(Phaser.Keyboard.L)) {
           if (this.moving2 !== 0) {
             playerEvents.push (function() {
-                console.log ("Send stop move")
                 that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
                 });
           }
@@ -282,7 +248,6 @@ TestState.prototype = {
       if (this.moving2 !== 0 && !(keyboard.isDown(Phaser.Keyboard.H) || keyboard.isDown(Phaser.Keyboard.L))) {
           this.moving2 = 0;
           playerEvents.push (function() {
-              console.log ("Send stop move")
               that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
               });
       }
@@ -321,9 +286,9 @@ TestState.prototype = {
 
       // update stuff
       var that = this;
-      console.log("pretick")
       frp.sync(function() {b.preTick.send(that.game.time.elapsed)});
       // update tick
+      this.keyboardInput.executeCommands()
       for (var index in playerEvents) {
           frp.sync(playerEvents[index]);
       }
@@ -333,10 +298,8 @@ TestState.prototype = {
       playerEvents = []
       this.playerEvents = []
 
-      console.log("tick")
-      frp.sync(function() {b.tick.send(that.game.time.elapsed)});
 
-      console.log("posttick")
+      frp.sync(function() {b.tick.send(that.game.time.elapsed)});
       frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
 
       //

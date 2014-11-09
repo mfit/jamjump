@@ -24,7 +24,9 @@ describe "Player behaviors", ->
 
         frp.sync (-> tick.send 1000)
         (expect blockSetter.blockpower.value()).toBe blockSetter.MAXPOWER
+        return
 
     it "test server world", ->
-        w = new world.World
+        #w = new world.World
+        return
         

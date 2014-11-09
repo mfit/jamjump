@@ -38,6 +38,7 @@ Menu.prototype = {
 
     // Other menu points
     menu.push({text: "Goto 'test'-state", action: function () { this.game.state.start('test');}});
+    menu.push({text: "Goto 'input'-state", action: function () { this.game.state.start('input');}});
 
     //
     // Render the menu

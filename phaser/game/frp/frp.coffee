@@ -485,6 +485,15 @@ applicative = (bf_, bb_) ->
         addCleanup_Listen unlistener, l
 
     keepAliveRef = {ref:null}
+
+    if bf_.hasOwnProperty 'ref'
+        bf_.sample = bf_
+        bf_.dep = bf_
+
+    if bb_.hasOwnProperty 'ref'
+        bb_.sample = bb_
+        bb_.dep = bb_
+    
     s = new Sample (->
         if bf_.hasOwnProperty 'ref'
             bf_ = bf_.ref
