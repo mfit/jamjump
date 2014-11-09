@@ -44,9 +44,9 @@ TestState.prototype = {
         this.game.world.height = 5000;
 
         this.frpPlayer = this.frpWorld.players[0];
-        this.otherFrpPlayer = this.frpWorld.players[0];
+        this.otherFrpPlayer = this.frpWorld.players[1];
 
-        this.keyboardInput = new input.KeyboardInput({
+        this.keyboardInputP1 = new input.KeyboardInput({
             moveLeftDown:this.input.keyDownEvent['A'],
             moveLeftUp:this.input.keyUpEvent['A'],
             moveRightDown:this.input.keyDownEvent['D'],
@@ -57,8 +57,21 @@ TestState.prototype = {
             move: this.frpPlayer.moveEvent,
             jump: this.frpPlayer.jumpEvent,
             });
+
+         this.keyboardInputP2 = new input.KeyboardInput({
+            moveLeftDown:this.input.keyDownEvent['H'],
+            moveLeftUp:this.input.keyUpEvent['H'],
+            moveRightDown:this.input.keyDownEvent['L'],
+            moveRightUp:this.input.keyUpEvent['L'],
+            jumpDown:this.input.keyDownEvent['K'],
+            jumpUp:this.input.keyUpEvent['K'],
+            }, {
+            move: this.otherFrpPlayer.moveEvent,
+            jump: this.otherFrpPlayer.jumpEvent,
+            });
       
-        frp.sync(function() {that.keyboardInput.mkBehaviors();});
+        frp.sync(function() {that.keyboardInputP1.mkBehaviors();});
+        frp.sync(function() {that.keyboardInputP2.mkBehaviors();});
 
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -206,70 +219,10 @@ TestState.prototype = {
               that.frpPlayer.setBlockEvent.send(true);
               });
       }
-      if (!this.jumpDown2 && this.game.input.keyboard.isDown(Phaser.Keyboard.K)) {
-          playerEvents.push (function() {
-              that.otherFrpPlayer.jumpEvent.send(true);
-              });
-          this.jumpDown2 = true;
-      } else if (this.jumpDown2 && !keyboard.isDown(Phaser.Keyboard.K)) {
-          this.jumpDown2 = false;
-      }
-
       if (this.game.input.keyboard.isDown(Phaser.Keyboard.J)) {
           playerEvents.push (function() {
               that.otherFrpPlayer.setBlockEvent.send(true);
               });
-      }
-
-      if (this.moving2 !== -1 && keyboard.isDown(Phaser.Keyboard.H) && !keyboard.isDown(Phaser.Keyboard.L)) {
-          if (this.moving2 !== 0) {
-            playerEvents.push (function() {
-                that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
-                });
-          }
-          playerEvents.push (function() {
-              that.otherFrpPlayer.moveEvent.send(new b.MoveEvent(-1, 0));
-              });
-
-              this.moving2 = -1;
-      }
-      if (this.moving2 !== 1 && !keyboard.isDown(Phaser.Keyboard.H) && keyboard.isDown(Phaser.Keyboard.L)) {
-          if (this.moving2 !== 0) {
-            playerEvents.push (function() {
-                that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
-                });
-          }
-          playerEvents.push (function() {
-            that.otherFrpPlayer.moveEvent.send(new b.MoveEvent(1, 0));
-            });
-          this.moving2 = 1;
-      }
-
-      if (this.moving2 !== 0 && !(keyboard.isDown(Phaser.Keyboard.H) || keyboard.isDown(Phaser.Keyboard.L))) {
-          this.moving2 = 0;
-          playerEvents.push (function() {
-              that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
-              });
-      }
-
-
-      if (this.qDown === false && keyboard.isDown(Phaser.Keyboard.Q)) {
-          playerEvents.push (function() {
-              that.frpPlayer.setMovementSystem.send('BaseMovement')
-              });
-          this.qDown = true;
-      } else if (this.qDown === true && !keyboard.isDown(Phaser.Keyboard.Q)) {
-          this.qDown = false;
-      }
-
-
-      if (this.eDown === false && keyboard.isDown(Phaser.Keyboard.E)) {
-          playerEvents.push (function() {
-              that.frpPlayer.setMovementSystem.send('OtherMovement')
-              });
-          this.eDown = true;
-      } else if (this.qDown === true && !keyboard.isDown(Phaser.Keyboard.E)) {
-          this.eDown = false;
       }
 
       if (keyboard.isDown(Phaser.Keyboard.F)) {
@@ -288,7 +241,8 @@ TestState.prototype = {
       var that = this;
       frp.sync(function() {b.preTick.send(that.game.time.elapsed)});
       // update tick
-      this.keyboardInput.executeCommands()
+      this.keyboardInputP1.executeCommands()
+      this.keyboardInputP2.executeCommands()
       for (var index in playerEvents) {
           frp.sync(playerEvents[index]);
       }

@@ -18,20 +18,21 @@ setup = (@game, world) ->
 
     for player in world.players
         setupPlayer player, @game
-        s = preTick.onTickDo world.worldBlocks, (((player) => (blockManager) =>
-            game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
-                if group_sprite.body.touching.up == true
-                    group_sprite.block.touchEvent.send true
-                if sprite.body.touching.down == true
-                    player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
+        s = (player) =>
+            preTick.onTickDo world.worldBlocks, (((blockManager) =>
+                game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
+                    if group_sprite.body.touching.up == true
+                        group_sprite.block.touchEvent.send true
+                    if sprite.body.touching.down == true
+                        player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
 
-                if sprite.body.touching.left == true 
-                    player.touchedWall.send (-1)
-                if sprite.body.touching.right == true
-                    player.touchedWall.send 1
-            ) player)
-       # side effects
-       s.listen ((v) ->)
+                    if sprite.body.touching.left == true 
+                        player.touchedWall.send (-1)
+                    if sprite.body.touching.right == true
+                        player.touchedWall.send 1
+                ) )
+        # side effects
+        (s player).listen ((v) ->)
 
 setupCamera = (@game, world, camera) ->
     @game.camera.bounds = null
@@ -161,7 +162,7 @@ class ParticleGroup
 
         inners = []
         outers = []
-        for i in [0..200]
+        for i in [0..10]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
             inners.push innerGlow
@@ -199,15 +200,16 @@ class ParticleGroup
                 outers[i].scale.set (2 + (Math.sin(outers[i].s))*5), (2 + (Math.sin(outers[i].s2))*5)
             )
 
-playerSourceDim = [58, 82] # width, height
-playerBodyRight = (player) ->#[14, 78, 23, 2])
+playerBodyRight1 = (player) ->#[14, 78, 23, 2])
         player.sprite.body.setSize 14, 78, -25, 2
-playerBodyLeft = (player) ->#[14, 78, 58-23-14, 2]
+playerBodyLeft1 = (player) ->#[14, 78, 58-23-14, 2]
         player.sprite.body.setSize 14, 78, 23, 2
 
-leftOffset = 0
-rightOffset = 58
-    
+playerBodyRight2 = (player) ->#[14, 78, 23, 2])
+        player.sprite.body.setSize 14, 56, -25, 10
+playerBodyLeft2 = (player) ->#[14, 78, 58-23-14, 2]
+        player.sprite.body.setSize 14, 56, 23, 10
+
 setupPlayer = (player, game) ->
     player.sprite = game.add.sprite 100, 200, player.spriteKey
     #player.sprite.shader = new shaders.TestFilter 1, 0, 0, 0.5
@@ -219,9 +221,9 @@ setupPlayer = (player, game) ->
     game.physics.enable player.sprite, Phaser.Physics.ARCADE, true
     player.sprite.body.collideWorldBounds = true
     if player.spriteKey == 'runner1'
-        playerBodyRight player
+        playerBodyRight1 player
     else
-        player.sprite.body.setSize 14, 56, 23, 10
+        playerBodyRight2 player
 
     setupCollisionBox (player.pushBox)
 
@@ -239,13 +241,21 @@ setupMovement = (player, movement) ->
         player.sprite.scale.set (-dir.x), 1
         console.log player.sprite.body
         if ((-dir.x) == 1) and ((-dir.x) != player.oldDir)
-            player.sprite.x -= 58
             player.oldDir = (-dir.x)
-            playerBodyLeft player
+            if player.spriteKey == 'runner1'
+                player.sprite.x -= 58
+                playerBodyLeft1 player
+            else
+                player.sprite.x -= 58
+                playerBodyLeft2 player
         else if ((-dir.x) == -1) and ((-dir.x) != player.oldDir)
-            player.sprite.x += 58
             player.oldDir = (-dir.x)
-            playerBodyRight player
+            if player.spriteKey == 'runner1'
+                player.sprite.x += 58
+                playerBodyRight1 player
+            else
+                player.sprite.x += 58
+                playerBodyRight2 player
         )
 
 setupCollisionBox = (box) ->

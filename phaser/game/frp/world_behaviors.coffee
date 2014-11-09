@@ -172,34 +172,34 @@ class World
         playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
             new player.Player playerTick, "p1", 'runner1'
-            #new player.Player playerTick, "p2", 'runner2'
+            new player.Player playerTick, "p2", 'runner2'
          #   new player.Player game, "p3"
         ]
 
         # TODO move this inside the player
         #console.log @players[0]
-        #@players[0].pushVel.ref = frp.pure (player.Vector.null())
-        @players[0].pushVel.ref = frp.pure (player.Vector.null());
-        #@players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].jumpEvent
+        @players[0].pushVel.ref = frp.pure (player.Vector.null())
+        #@players[0].pushVel.ref = frp.pure (player.Vector.null());
+        @players[1].pushVel.ref = new player.Push @tick, @players[0], @players[1], @players[0].setBlockEvent
 
-        #@players[0].pullVel.ref = new player.Pull @tick, @players[1], @players[0], @players[1].jumpEvent
-        #@players[1].pullVel.ref = frp.pure (player.Vector.null());
-        @players[0].pullVel.ref = frp.pure (player.Vector.null());
+        @players[0].pullVel.ref = new player.Pull @tick, @players[1], @players[0], @players[1].setBlockEvent
+        @players[1].pullVel.ref = frp.pure (player.Vector.null());
+        #@players[0].pullVel.ref = frp.pure (player.Vector.null());
 
         #@players[0].pushBox.addColliders.send (@players[1])
     
         @worldBlocks = BlockManager.mkBehaviors()
         @camera = new Camera tick, this
 
-        for player in @players
-            setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
-                gridsize = 50;
-                x = Math.floor(pos.x / gridsize)
-                y = Math.floor(pos.y / gridsize + 1)
-                @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
-                )
-            # side effects
-            setting.listen ((v) -> )
+        # for player in @players
+        #     setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
+        #         gridsize = 50;
+        #         x = Math.floor(pos.x / gridsize)
+        #         y = Math.floor(pos.y / gridsize + 1)
+        #         @worldBlocks.addBlock.send {x:x, y:y, block: new DefaultBlock}
+        #         )
+        #     # side effects
+        #     setting.listen ((v) -> )
 
     save: ->
     reload: ->

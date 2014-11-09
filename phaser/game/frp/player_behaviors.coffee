@@ -28,12 +28,12 @@ class Player
         #             movement = new Movement tick, _this
         #             return movement.value
         # }, @tick, this
-        @blockSetter = new BlockSetter @tick, @setBlockEvent
+        #@blockSetter = new BlockSetter @tick, @setBlockEvent
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
         @setPosition = new frp.EventStream "SetPosition"
 
-        int = @tick.snapshot @movement, ((t, v) -> t * v.vx / 1000.0)
+        int = @tick.snapshot @movement, ((t, v) -> t * v.x / 1000.0)
     
         effects = [
             @setPosition.map ((pos) -> (oldPos) -> pos)
@@ -224,6 +224,8 @@ class Movement
         @player.pullVel = {ref:null}
 
         @value = frp.apply value, fallV, (x, y) -> Vector.add x, y
+        @value = frp.apply @value, @player.pushVel, (x, y) -> Vector.add x, y
+        @value = frp.apply @value, @player.pullVel, (x, y) -> Vector.add x, y
         # FIXME
         @value.direction = @direction
         @value.startMove = startMove
@@ -290,21 +292,17 @@ class Jumping
             return frp.hold true, (end.constMap false)
             )
 
-        @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
-        canWallJump2 = @jumpsSinceLand.map ((jumps) => jumps < (@MAX_JUMPS + 1))
+        @canJump = @jumpsSinceLand.map ((jumps) => jumps <= @MAX_JUMPS)
+        canWallJump2 = @jumpsSinceLand.map ((jumps) => jumps <= (@MAX_JUMPS + 1))
 
-        @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
+        @value = (jumpStarters.delay().constMap @JUMPFORCE).gate @canJump
         @value = @value.gate (canWallJump.not())
 
         wallJumpVel = dir.map ((x) => new Vector (x*-400), @JUMPFORCE)
-        @value2 = jumpStarters.gate canWallJump2
-        @value2.listen (log "WALLJUMP")
+        @value2 = jumpStarters.delay().gate canWallJump2
         @value2 = @value2.gate (@jumpsSinceLand.map ((jumps) -> jumps >= 1))
-        @value2.listen (log "WALLJUMP")
         @value2 = @value2.gate canWallJump
-        @value2.listen (log "WALLJUMP")
         @value2 = @value2.snapshot wallJumpVel, frp.second
-        @value2.listen (log "WALLJUMP")
 
 class Vector
     constructor: (@x, @y) ->
@@ -367,6 +365,7 @@ class Pull
             return (frp.tickEvery @tick, 500).once()
 
         distanceOnCharge = charge.snapshotMany [@player1.position, @player2.position], (_, p1, p2) ->
+            console.log p1, p2
             return (Vector.diff p1, p2)
 
         distance = frp.hold Vector.null(), distanceOnCharge
@@ -375,10 +374,13 @@ class Pull
         pushDuration = frp.onEventMakeEvent charge, => frp.tickFor @tick, 500
         pushEnd = frp.onEventMakeEvent charge, => (frp.tickEvery @tick, 500).once()
 
-        pushVel = frp.hold 0, (frp.mergeAll [
-            pushDuration.snapshot distance, ((_, dist) -> Vector.scalar (pullStrength*dist.length()), (dist.dir()))
+        pushVel = frp.hold (Vector.null()), (frp.mergeAll [
+            pushDuration.snapshot distance, ((_, dist) ->
+                Vector.scalar (pullStrength*dist.length()), (dist.dir()))
             pushEnd.constMap (Vector.null())
             ])
+
+        pushVel.updates().listen (log ("PUSH"))
 
         return pushVel
 
@@ -396,7 +398,7 @@ class Push
         pushDuration = frp.onEventMakeEvent charge, => frp.tickFor @tick, 500
         pushEnd = frp.onEventMakeEvent charge, => (frp.tickEvery @tick, 500).once()
 
-        pushVel = frp.hold 0, (frp.mergeAll [
+        pushVel = frp.hold (Vector.null()), (frp.mergeAll [
             pushDuration.snapshot distance, ((_, dist) -> Vector.scalar (-pullStrength*dist.length()), (dist.dir()))
             pushEnd.constMap (Vector.null())
             ])
