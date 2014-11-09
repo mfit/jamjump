@@ -36,19 +36,22 @@ setup = (@game, world) ->
 setupCamera = (@game, world, camera) ->
     @game.camera.bounds = null
 
+    zoneX = 200
+    zoneY = 100
+
     world.players[0].position.updates().listen ((pos) =>
         distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
         distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
-        if (Math.abs distance) > 200
+        if (Math.abs distance) > zoneX
              if (distance > 0)
-                @game.camera.x = @game.camera.x + (-distance + 200)
+                @game.camera.x = @game.camera.x + (-distance + zoneX)
              else if distance < 0
-                @game.camera.x = @game.camera.x + (-distance - 200)
-        if (Math.abs distance_y) > 200
+                @game.camera.x = @game.camera.x + (-distance - zoneX)
+        if (Math.abs distance_y) > zoneY
             if distance_y < 0
-                @game.camera.y += (-distance_y - 200)
+                @game.camera.y += (-distance_y - zoneY)
             else if distance_y > 0
-                @game.camera.y += (-distance_y + 200)
+                @game.camera.y += (-distance_y + zoneY)
         )
 
     # SHAKIN
@@ -196,16 +199,27 @@ class ParticleGroup
                 outers[i].scale.set (2 + (Math.sin(outers[i].s))*5), (2 + (Math.sin(outers[i].s2))*5)
             )
 
+playerSourceDim = [58, 82] # width, height
+playerBodyRight = (player) ->#[14, 78, 23, 2])
+        player.sprite.body.setSize 14, 78, -25, 2
+playerBodyLeft = (player) ->#[14, 78, 58-23-14, 2]
+        player.sprite.body.setSize 14, 78, 23, 2
+
+leftOffset = 0
+rightOffset = 58
+    
 setupPlayer = (player, game) ->
-    player.sprite = game.add.sprite 1000, 200, player.spriteKey
+    player.sprite = game.add.sprite 100, 200, player.spriteKey
+    #player.sprite.shader = new shaders.TestFilter 1, 0, 0, 0.5
     player.sprite.animations.add 'walk'
     player.sprite.behavior = this
-    player.sprite.scale.set -1, 1
+    player.sprite.scale.set (-1), 1
+    player.oldDir = -1
     #player.sprite.shader = new TestFilter 200, 0, 0
     game.physics.enable player.sprite, Phaser.Physics.ARCADE, true
     player.sprite.body.collideWorldBounds = true
     if player.spriteKey == 'runner1'
-        player.sprite.body.setSize 14, 78, 23, 2
+        playerBodyRight player
     else
         player.sprite.body.setSize 14, 56, 23, 10
 
@@ -214,7 +228,6 @@ setupPlayer = (player, game) ->
     setupMovement player, player.movement
 
     t = postTick.snapshotMany [player.movement, player.pushBox.movement], ((t, speed, boxSpeed) =>
-        console.log player.sprite.y
         player.sprite.body.velocity.x = speed.x
         player.sprite.body.velocity.y = speed.y
         )
@@ -224,6 +237,15 @@ setupMovement = (player, movement) ->
     movement.walkAnim = WalkAnimation.mkBehavior player, tick, movement.startMove, movement.stopMove
     movement.direction.updates().listen ((dir) =>
         player.sprite.scale.set (-dir.x), 1
+        console.log player.sprite.body
+        if ((-dir.x) == 1) and ((-dir.x) != player.oldDir)
+            player.sprite.x -= 58
+            player.oldDir = (-dir.x)
+            playerBodyLeft player
+        else if ((-dir.x) == -1) and ((-dir.x) != player.oldDir)
+            player.sprite.x += 58
+            player.oldDir = (-dir.x)
+            playerBodyRight player
         )
 
 setupCollisionBox = (box) ->

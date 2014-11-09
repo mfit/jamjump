@@ -5,12 +5,15 @@ class TestFilter extends PIXI.AbstractFilter
         this.uniforms =
             color:
                 type: '4f'
-                value: {x:r/255.0, y:g/255.0, z:b/255.0, w:a}
+                value: {x:r, y:g, z:b, w:a}
         @fragmentSrc = [
             'precision mediump float;'
             'uniform vec4 color;'
+            'varying vec2 vTextureCoord;'
+            'uniform sampler2D uSampler;'
             'void main () {'
-            '   gl_FragColor = color;'
+            '   vec4 texColor = texture2D(uSampler, vTextureCoord);'
+            '   gl_FragColor = color + texColor;'
             '}'
         ] 
 

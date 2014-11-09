@@ -130,6 +130,12 @@ class Movement
         directionWanted = frp.hold Direction.null(), (wantsMoveEvent.map ((e) -> e.dir))
         @direction = directionWanted
 
+        onGround = frp.onEventMakeBehavior false, player.landedOnBlock, (_) =>
+            tick = frp.timer @tick, 20
+            return frp.hold true, (tick.constMap false)
+
+        inAir = onGround.not()
+
         wantsMove = frp.holdAll false, [
             wantsMoveEvent.constMap true
             wantsStopMoveEvent.constMap false
@@ -142,32 +148,53 @@ class Movement
         jumping = frp.holdAll false, [
             @player.jumpEvent.constMap true
             @player.landedOnBlock.constMap false
+            inAir.updates()
         ]
 
         canStartMove = startMove.gate (jumping.not())
+        currentDir = frp.hold Direction.null(), (canStartMove.map (e) -> e.dir)
 
         @speed = 300
 
         running = frp.holdAll false, [
             canStartMove.constMap true
-            stopMove.constMap false
+            wantsStopMoveEvent.constMap false
             ]
 
         moving = frp.apply running, jumping, (bMov, bJump) ->
             bMov and (not bJump)
         
+        playerJumping = @player.jumping
         velXmods = frp.mergeAll [
-            startMove.map (dir) ->
+            canStartMove.map (dir) ->
                 (oldV) -> dir.dir.x * 300
+            playerJumping.value2.map ((v) -> (old) -> old + v.x)
             ]
 
         runForce = null #new Force @tick, frp.never, 0, 0
 
-        drag = frp.apply moving, jumping, (bMov, bJump) ->
+        modDrag = frp.hold ((dt) -> (v) -> v), (startMove.delay().snapshot currentDir, (wantsDir, curDir) -> 
+            (dt) -> (v) ->
+                if wantsDir.dir.x == curDir.x
+                    return lowerCap (v - dt/1000.0), 0.1
+                else if wantsDir.x == 0
+                    return v
+                else
+                    upperCap (v + 5*dt/1000.0), 5
+            )
+        modDrag = @tick.snapshot modDrag, (dt, f) -> f dt
+
+        dragMod = frp.accumAll 0.5, [
+            @player.landedOnBlock.constMap (v) -> 0.5
+            modDrag.map (f) -> (v) -> f v
+            ]
+
+        drag2 = frp.apply dragMod, jumping, ((mod, bJump) -> [bJump, mod])
+        drag = frp.apply moving, drag2, (bMov, [bJump, jumpDrag]) ->
             if bMov
                 0
             else if bJump
-                0.5
+                jumpDrag
             else
                 16
     
@@ -177,12 +204,14 @@ class Movement
         resetVel = @player.landedOnBlock.map (v) ->
             (oldV) -> v
 
-        jumping = @player.jumping
-        jump = jumping.value.map ((v) -> (old) ->
-            old + v)
+        jump = playerJumping.value.map ((v) -> (old) ->
+            v)
 
-        mods = frp.merge resetVel, jump
-
+        mods = frp.mergeAll [
+            resetVel
+            jump
+            playerJumping.value2.map ((v) -> (old) -> v.y)
+            ]
     
         gravTick = @tick #@tick.gate (dash.dashing.not())
         
@@ -190,7 +219,6 @@ class Movement
         gravVel = new Velocity gravTick, mods, 2000, gravity
         fallV = frp.hold (Vector.null()), (gravVel.updates().map ((v) -> new Vector 0, v))
 
-        fallV.updates().listen (log "fallV")
 
         @player.pushVel = {ref:null}
         @player.pullVel = {ref:null}
@@ -199,7 +227,7 @@ class Movement
         # FIXME
         @value.direction = @direction
         @value.startMove = startMove
-        @value.stopMove = stopMove
+        @value.stopMove = wantsStopMoveEvent
         return @value
 
 lowerCap = (v, cap) -> if v < cap then return cap else v
@@ -263,15 +291,20 @@ class Jumping
             )
 
         @canJump = @jumpsSinceLand.map ((jumps) => jumps < @MAX_JUMPS)
+        canWallJump2 = @jumpsSinceLand.map ((jumps) => jumps < (@MAX_JUMPS + 1))
 
         @value = (jumpStarters.constMap @JUMPFORCE).gate @canJump
         @value = @value.gate (canWallJump.not())
 
-        wallJumpVel = dir.map ((x) -> new Vector (x*-1200), -800)
-        @value2 = jumpStarters.gate @canJump
-        @value2 = @value2.gate (@jumpsSinceLand.map ((jumps) -> jumps > 1))
+        wallJumpVel = dir.map ((x) => new Vector (x*-400), @JUMPFORCE)
+        @value2 = jumpStarters.gate canWallJump2
+        @value2.listen (log "WALLJUMP")
+        @value2 = @value2.gate (@jumpsSinceLand.map ((jumps) -> jumps >= 1))
+        @value2.listen (log "WALLJUMP")
         @value2 = @value2.gate canWallJump
+        @value2.listen (log "WALLJUMP")
         @value2 = @value2.snapshot wallJumpVel, frp.second
+        @value2.listen (log "WALLJUMP")
 
 class Vector
     constructor: (@x, @y) ->
@@ -347,10 +380,6 @@ class Pull
             pushEnd.constMap (Vector.null())
             ])
 
-        distance.updates().listen (log "Distance")
-        pushDuration.listen (log "push duration")
-        pushEnd.listen (log "Push end")
-    
         return pushVel
 
 class Push
