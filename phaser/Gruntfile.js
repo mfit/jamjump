@@ -110,7 +110,6 @@ module.exports = function (grunt) {
           // includes files within path and its sub-directories
           { expand: true, src: ['assets/**'], dest: 'dist/' },
           { expand: true, flatten: true, src: ['game/plugins/*.js'], dest: 'dist/js/plugins/' },
-          { expand: true, flatten: true, src: ['phaser/dist/*.js'], dest: 'dist/js/' },
           { expand: true, flatten: true, src: ['bower_components/**/dist/*.js'], dest: 'dist/js/' },
           { expand: true, src: ['css/**'], dest: 'dist/' },
           { expand: true, src: ['jasmine/**'], dest: 'dist/' },
@@ -121,7 +120,10 @@ module.exports = function (grunt) {
     browserify: {
       build: {
         src: ['game/main.js'],
-        dest: 'dist/js/game.js'
+        dest: 'dist/js/game.js',
+        options: {
+            exclude: ['nw.gui', 'http']
+            }
       },
       options: {
         browserifyOptions: {
@@ -132,6 +134,7 @@ module.exports = function (grunt) {
   });
 
 
+  grunt.registerTask('build_node', ['coffee', 'buildBootstrapper', 'copy']);
   grunt.registerTask('build', ['coffee', 'buildBootstrapper', 'browserify','copy']);
   grunt.registerTask('phaser', ['subgrunt']);
   grunt.registerTask('serve', ['build', 'connect:livereload', 'open', 'watch']);

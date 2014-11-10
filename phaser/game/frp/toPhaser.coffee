@@ -293,7 +293,7 @@ class WalkAnimation
         @running = false
         @advance = false
 
-        @msPerFrame = 50
+        @msPerFrame = 120
         @leftover = 0
 
     tick: (dt) ->

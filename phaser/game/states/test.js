@@ -1,5 +1,6 @@
 
 'use strict';
+var Phaser = require('../../phaser/dist/phaser-no-libs.js');
 var Tiled = require('../model/tiled.js');
 var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
@@ -13,6 +14,7 @@ var ru = require ('../render/RenderUnit.js');
 
 var tick = frp.tick
 
+
 function TestState() {}
 
 TestState.prototype = {
@@ -23,6 +25,7 @@ TestState.prototype = {
         this.game.time.advancedTiming = true
   },
   create: function () {
+        console.log(Phaser);
         //var e = Tiled.MakeObjectLayerSprites(this.game, this.map, 'Object Layer 1');
         //console.log(e);
         this.moveEvent = new frp.EventStream();

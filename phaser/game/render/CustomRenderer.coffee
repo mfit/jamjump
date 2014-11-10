@@ -200,6 +200,7 @@ class BufferManager
         # save state
         oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
 
+        console.log @shader.program
         gl.useProgram @shader.program
         vertexPos = gl.getAttribLocation @shader.program, 'vertexPosition'
         gl.vertexAttribPointer vertexPos, 2, gl.FLOAT, false, 8, 0
@@ -267,7 +268,7 @@ class LineRenderer
     upload: ->
         gl = @gl
 
-        @num = 5000
+        @num = 4000
         elementData = [0..@num*2]
         @vertexData = []
         for i in [0..(@num)]

@@ -1,5 +1,8 @@
 'use strict';
 
+global.PIXI = require('../phaser/dist/pixi.js');
+global.Phaser = require('../phaser/dist/phaser-arcade-physics.js');
+
 //global variables
 window.onload = function () {
   var game = new Phaser.Game(1920, 600, Phaser.AUTO, 'jamjump');
