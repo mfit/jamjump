@@ -17,7 +17,7 @@ setup = (@game, world) ->
     setupBlockManager game, world
 
     for player in world.players
-        setupPlayer player, @game
+        setupPlayer player, @game, world
         s = (player) =>
             preTick.onTickDo world.worldBlocks, (((blockManager) =>
                 game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
@@ -32,7 +32,7 @@ setup = (@game, world) ->
                         player.touchedWall.send 1
                 ) )
         # side effects
-        (s player).listen ((v) ->)
+        #(s player).listen ((v) ->)
 
 setupCamera = (@game, world, camera) ->
     @game.camera.bounds = null
@@ -212,7 +212,7 @@ playerBodyRight2 = (player) ->#[14, 78, 23, 2])
 playerBodyLeft2 = (player) ->#[14, 78, 58-23-14, 2]
         player.sprite.body.setSize 14, 56, 23, 10
 
-setupPlayer = (player, game) ->
+setupPlayer = (player, game, world) ->
     player.sprite = game.add.sprite 100, 200, player.spriteKey
     #player.sprite.shader = new shaders.TestFilter 1, 0, 0, 0.5
     player.sprite.animations.add 'walk'
@@ -231,17 +231,38 @@ setupPlayer = (player, game) ->
 
     setupMovement player, player.movement
 
-    t = postTick.snapshotMany [player.movement, player.pushBox.movement], ((t, speed, boxSpeed) =>
+    t = postTick.snapshotMany [player.movement, world.worldBlocks], (t, speed, blockManager) =>
         player.sprite.body.velocity.x = speed.x
         player.sprite.body.velocity.y = speed.y
-        )
+
+        console.log player.sprite.body.velocity.y
+        game.time.physicsElapsed = t/1000.0
+        player.sprite.body.preUpdate()
+        
+        game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
+            if group_sprite.body.touching.up == true
+                group_sprite.block.touchEvent.send true
+            if sprite.body.touching.down == true
+                player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
+
+            if sprite.body.touching.left == true 
+                player.touchedWall.send (-1)
+            if sprite.body.touching.right == true
+                player.touchedWall.send 1
+
+        player.sprite.body.postUpdate()
+        console.log player.sprite.body.velocity.y
+
+    t2 = postTick.delay().snapshotMany [player.movement, player.pushBox.movement], (t, speed, boxSpeed) =>
+        player.sprite.body.velocity.x = 0
+        player.sprite.body.velocity.y = 0
     t.listen ((v) ->)
+    t2.listen ((v) ->)
 
 setupMovement = (player, movement) ->
     movement.walkAnim = WalkAnimation.mkBehavior player, tick, movement.startMove, movement.stopMove
     movement.direction.updates().listen ((dir) =>
         player.sprite.scale.set (-dir.x), 1
-        console.log player.sprite.body
         if ((-dir.x) == 1) and ((-dir.x) != player.oldDir)
             player.oldDir = (-dir.x)
             if player.spriteKey == 'runner1'
@@ -269,7 +290,7 @@ setupCollisionBox = (box) ->
 
     box.sprite = game.add.sprite 100, 200, 'pixel'
     box.sprite.scale.set 20, 20
-    box.sprite.shader = new shaders.TestFilter 0, 0, 0, 0.9
+    box.sprite.shader = new shaders.TestFilter 1, 1, 0, 0.9
     game.physics.enable box.sprite, Phaser.Physics.ARCADE
     box.sprite.body.collideWorldBounds = false
     #box.sprite.body.setSize 7, 28, 3, 0
@@ -277,7 +298,7 @@ setupCollisionBox = (box) ->
     box.sprite.allowGravity = false#true
 
     box.active.updates().listen ((active) =>
-        box.sprite.shader.uniforms.color.value.x = active
+        box.sprite.shader.uniforms.color.value.x = 1
         )
 
     doCollision = preTick.gate box.active

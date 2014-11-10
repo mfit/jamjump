@@ -163,6 +163,8 @@ TestState.prototype = {
             })}, this);
 
       this.playerEvents = [];
+      this.running = true;
+      this.spaceDown = false;
   },
   getId: function() {
       return -1;
@@ -185,6 +187,14 @@ TestState.prototype = {
       var keyboard = this.game.input.keyboard;
       
       var playerEvents = []
+      
+      if (this.spaceDown == false && keyboard.isDown(Phaser.Keyboard.T)) {
+          this.running = !this.running;
+          this.spaceDown = true;
+        }
+      if (this.spaceDown == true && (!keyboard.isDown(Phaser.Keyboard.T))) {
+          this.spaceDown = false;
+          }
 
       if (this.jDown === false && keyboard.isDown(Phaser.Keyboard.N)) {
           this.jDown = true;
@@ -245,7 +255,9 @@ TestState.prototype = {
 
       // update stuff
       var that = this;
-      frp.sync(function() {b.preTick.send(that.game.time.elapsed)});
+      if (this.running) {
+        frp.sync(function() {b.preTick.send(that.game.time.elapsed)});
+      }
       // update tick
       this.keyboardInputP1.executeCommands()
       this.keyboardInputP2.executeCommands()
@@ -259,8 +271,10 @@ TestState.prototype = {
       this.playerEvents = []
 
 
-      frp.sync(function() {b.tick.send(that.game.time.elapsed)});
-      frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
+      if (this.running) {
+        frp.sync(function() {b.tick.send(that.game.time.elapsed)});
+        frp.sync(function() {b.postTick.send(that.game.time.elapsed)});
+      }
 
       //
       // Test for pause key
