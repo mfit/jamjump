@@ -122,7 +122,7 @@ module.exports = function (grunt) {
         src: ['game/main.js'],
         dest: 'dist/js/game.js',
         options: {
-            exclude: ['nw.gui', 'http']
+            exclude: ['nw.gui']
             }
       },
       options: {

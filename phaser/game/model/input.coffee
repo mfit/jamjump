@@ -41,6 +41,7 @@ class Input
         @keys['X'] = @keyboard.addKey Phaser.Keyboard.X
         @keys['Y'] = @keyboard.addKey Phaser.Keyboard.Y
         @keys['Z'] = @keyboard.addKey Phaser.Keyboard.Z
+        @keys['SPACE'] = @keyboard.addKey Phaser.Keyboard.SPACE
 
         for key of @keys
             @keys[key].onDown.add ((k) => =>

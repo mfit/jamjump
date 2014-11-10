@@ -114,8 +114,10 @@ setupBlockManager = (game, world) ->
         setIndex = game.map.tiles[block.gid][2];
         set = game.map.tilesets[setIndex];
 
+        gid = (Math.floor (Math.random()*3))
+
         block.sprite = game.add.tileSprite (coords.x + set.tileOffset.x),
-                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", block.gid
+                (coords.y + set.tileOffset.y), set.tileWidth, set.tileHeight, "test", gid
         bm.block_group.addChild block.sprite
 
         if neighbors.bottom != null
@@ -267,7 +269,7 @@ setupCollisionBox = (box) ->
 
     box.sprite = game.add.sprite 100, 200, 'pixel'
     box.sprite.scale.set 20, 20
-    box.sprite.shader = new shaders.TestFilter 0, 0, 0, 0.2
+    box.sprite.shader = new shaders.TestFilter 0, 0, 0, 0.9
     game.physics.enable box.sprite, Phaser.Physics.ARCADE
     box.sprite.body.collideWorldBounds = false
     #box.sprite.body.setSize 7, 28, 3, 0
