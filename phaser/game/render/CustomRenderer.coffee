@@ -211,7 +211,7 @@ class BufferManager
 
     render: ->
         gl = @gl
-        gl.viewport 0, 0, 1920, 768
+        gl.viewport 0, 0, 800, 600
         gl.disable gl.BLEND
         gl.disable gl.DEPTH_TEST
         gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
@@ -268,7 +268,7 @@ class LineRenderer
     upload: ->
         gl = @gl
 
-        @num = 4000
+        @num = 2000
         elementData = [0..@num*2]
         @vertexData = []
         for i in [0..(@num)]

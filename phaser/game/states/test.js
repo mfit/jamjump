@@ -25,9 +25,7 @@ TestState.prototype = {
         this.game.time.advancedTiming = true
   },
   create: function () {
-        console.log(Phaser);
         //var e = Tiled.MakeObjectLayerSprites(this.game, this.map, 'Object Layer 1');
-        //console.log(e);
         this.moveEvent = new frp.EventStream();
         this.game.world.scale.set (1, 1)
         this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.NO_SCALE;
@@ -96,7 +94,7 @@ TestState.prototype = {
         }
         this.game.rootGroup.add(this.frpWorld.particles.group);
         for (var i = 0; i < this.frpWorld.players.length; i++) {
-            this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
+            //this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
         }
 
 
@@ -170,9 +168,9 @@ TestState.prototype = {
       return -1;
   },
   render: function () {
-      // this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
-      // this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
-      // this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
+      this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
+      this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
+      this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
   },
   update: function () {
         this.game.stage.backgroundColor = 
@@ -224,7 +222,7 @@ TestState.prototype = {
             var x = function (i) { 
                 playerEvents.push (function() {
                     that.frpWorld.players[i].setPosition.send(new b.Direction (
-                        that.frpWorld.players[i].sprite.body.x, that.frpWorld.players[i].sprite.body.y));
+                        that.frpWorld.players[i].sprite.x, that.frpWorld.players[i].sprite.y));
             }); }
             x(i);
       }
@@ -236,6 +234,11 @@ TestState.prototype = {
               });
       }
       if (this.game.input.keyboard.isDown(Phaser.Keyboard.J)) {
+          playerEvents.push ({
+              target:'otherFrpPlayer',
+              event:'setBlockEvent',
+              value:true
+          });
           playerEvents.push (function() {
               that.otherFrpPlayer.setBlockEvent.send(true);
               });

@@ -96,7 +96,7 @@ setupBlockManager = (game, world) ->
     bm.coll_group.immovable = true;
     bm.coll_group.invisible = true;
 
-    bm.block_group = game.add.group(); #new render.BlockSpriteBatch @game
+    bm.block_group = game.add.group()#new render.BlockSpriteBatch @game
 
     world.worldBlocks.addedBlock.listen (blockInfo) ->
         x = blockInfo.x
@@ -164,7 +164,7 @@ class ParticleGroup
 
         inners = []
         outers = []
-        for i in [0..10]
+        for i in [0..1]
             innerGlow = new Phaser.Particle game, i, 200, 'pixel'
             outerGlow = new Phaser.Particle game, i, 200, 'pixel'
             inners.push innerGlow
@@ -235,7 +235,6 @@ setupPlayer = (player, game, world) ->
         player.sprite.body.velocity.x = speed.x
         player.sprite.body.velocity.y = speed.y
 
-        console.log player.sprite.body.velocity.y
         game.time.physicsElapsed = t/1000.0
         player.sprite.body.preUpdate()
         
@@ -251,7 +250,6 @@ setupPlayer = (player, game, world) ->
                 player.touchedWall.send 1
 
         player.sprite.body.postUpdate()
-        console.log player.sprite.body.velocity.y
 
     t2 = postTick.delay().snapshotMany [player.movement, player.pushBox.movement], (t, speed, boxSpeed) =>
         player.sprite.body.velocity.x = 0
@@ -316,24 +314,25 @@ class WalkAnimation
         @running = false
         @advance = false
 
-        @msPerFrame = 120
+        @msPerFrame = 80
         @leftover = 0
 
     tick: (dt) ->
         if @leftover + dt > @msPerFrame
-            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 3)
-                @player.sprite.animations.frame = 4
+            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
+                @player.sprite.animations.frame = 12
                 @running = false
                 @leftover = 0
                 return
 
-            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 7)
-                @player.sprite.animations.frame = 0
+            if (@advance == false) and (@player.sprite.animations.currentFrame.index == 10)
+                @player.sprite.animations.frame = 12
                 @running = false
                 @leftover = 0
                 return
 
-            if @player.sprite.animations.currentFrame.index == 7
+            console.log @player.sprite.animations.currentFrame.index
+            if @player.sprite.animations.currentFrame.index == 11
                 @player.sprite.animations.frame = 0
             else
                 @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
@@ -342,6 +341,7 @@ class WalkAnimation
         @leftover += dt
 
     startRun: () ->
+        @player.sprite.animations.frame = 9
         @advance = true
         @running = true
 
@@ -353,8 +353,10 @@ class WalkAnimation
     @mkBehavior: (player, tick, startMove, stopMove) ->
         # we only need to step the animation when it is running
         anim = {ref:null}
-        r = frp.mapB anim, ((anim) -> anim.isRunning())
-        tickWhenRunning = tick.gate r
+        isRunning = frp.mapB anim, ((anim) -> anim.isRunning())
+        tickWhenRunning = tick.gate isRunning
+
+        startMove = startMove.gate (isRunning.not())
 
         anim.ref = frp.accumAll (new WalkAnimation player), [
             startMove.constMap (anim) ->

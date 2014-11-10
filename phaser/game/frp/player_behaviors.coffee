@@ -365,7 +365,6 @@ class Pull
             return (frp.tickEvery @tick, 500).once()
 
         distanceOnCharge = charge.snapshotMany [@player1.position, @player2.position], (_, p1, p2) ->
-            console.log p1, p2
             return (Vector.diff p1, p2)
 
         distance = frp.hold Vector.null(), distanceOnCharge
@@ -379,8 +378,6 @@ class Pull
                 Vector.scalar (pullStrength*dist.length()), (dist.dir()))
             pushEnd.constMap (Vector.null())
             ])
-
-        pushVel.updates().listen (log ("PUSH"))
 
         return pushVel
 
