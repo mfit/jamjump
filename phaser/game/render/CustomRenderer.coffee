@@ -304,7 +304,6 @@ class LineRenderer
 
     render: ->
         gl = @gl
-        gl.viewport 0, 0, 1920, 600
         gl.disable gl.BLEND
         gl.disable gl.DEPTH_TEST
         gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
@@ -338,6 +337,113 @@ class LineRenderer
         # restore state
         gl.useProgram oldProg
 
+class PointShader
+    constructor: (gl) ->
+        colors = [
+            [0.1, 255, 251, 221]
+            [0.3, 255, 238, 10]
+            [0.5, 250, 176, 3]
+            [99.1, 242, 144, 0]
+            ]
+
+        fs = [
+            'precision mediump float;'
+            'varying vec2 vPos;'
+            'void main(void) {'
+            '    float l = length(vPos);'
+            ]
+        for color in colors
+            [d, r, g, b] = color
+            fs.push "if (l < #{d}) {"
+            fs.push "    gl_FragColor = vec4(#{r}.0/255.0, #{g}.0/255.0, #{b}.0/255.0, 1);"
+            fs.push "    return;}"
+        fs.push '}'
+
+        console.log fs
+
+        @program = PIXI.compileProgram gl, [
+            'attribute vec2 vertexPosition;'
+
+            'uniform float time;'
+
+            'varying vec2 vPos;'
+
+            'void main(void) {'
+            '    float l = length(vertexPosition);'
+            '    vec2 offset = vec2(0.0, 0.0);'
+                'if (l > 0.5) { offset.x = 0.1;}'
+            '    float initA = atan(vertexPosition.y, vertexPosition.x + offset.x);'
+            '    float dt = initA + time*15.0*(l*l*2.5);'
+            '    vec2 pos = vec2(cos(dt)*l, sin(dt)*l);'
+            '    gl_Position = vec4(pos, 0, 1);'
+            '    gl_PointSize = 10.0;'
+            '    vPos = pos;'
+            '}'
+            ], fs
+randomRange = (a, b) ->
+    Math.random()*(b - a) + a
+
+class PointRenderer
+    constructor: (@gl) ->
+        gl = @gl
+        @vertexBuffer = gl.createBuffer()
+        @indexBuffer = gl.createBuffer()
+        @shader = new PointShader @gl
+
+    upload: ->
+        gl = @gl
+
+        @num = 1000
+        elementData = [0..@num]
+        @vertexData = []
+        for i in [0..(@num)]
+            x = randomRange -0.6, 0.6
+            y = randomRange -0.6, 0.6
+            @vertexData.push x
+            @vertexData.push y
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bufferData gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(elementData), gl.STATIC_DRAW
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+        gl.bufferData gl.ARRAY_BUFFER, new Float32Array(@vertexData), gl.STATIC_DRAW
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+
+        gl.useProgram @shader.program
+        @vertexPos = gl.getAttribLocation @shader.program, 'vertexPosition'
+        @time = gl.getUniformLocation @shader.program, 'time'
+
+        # restore state
+        gl.useProgram oldProg
+
+        @localTime = 0
+
+    render: ->
+        gl = @gl
+        gl.disable gl.BLEND
+        gl.disable gl.DEPTH_TEST
+        gl.viewport (1920/2.0-300/2.0), (300-300/2.0), 300, 300
+        gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+        gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+
+        # save state
+        oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+        gl.useProgram @shader.program
+        gl.vertexAttribPointer @vertexPos, 2, gl.FLOAT, false, 8, 0
+        gl.enableVertexAttribArray @vertexPos
+
+        gl.drawElements gl.POINTS, @num, gl.UNSIGNED_SHORT, 0
+
+        @localTime += 0.0016
+        gl.uniform1f @time, @localTime
+
+        gl.enable gl.BLEND
+        #gl.enable gl.DEPTH_TEST
+
+        # restore state
+        gl.useProgram oldProg
+        gl.viewport 0, 0, 1920, 600
+
 init = (gl) ->
     Phaser.TextureManager = new TextureManager gl
     Phaser.TextureManager.markUnitUsed gl.TEXTURE0
@@ -347,4 +453,5 @@ module.exports =
 #    TextureManager:TextureManager
     BufferManager:BufferManager
     LineRenderer:LineRenderer
+    PointRenderer:PointRenderer
     

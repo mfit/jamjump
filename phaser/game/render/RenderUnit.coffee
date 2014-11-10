@@ -14,10 +14,13 @@ RenderUnit::_renderWebGL = (renderSession) ->
         @initWebGL renderSession.gl
     renderSession.spriteBatch.stop()       
     @bm.render()
+    @bm2.render()
 
 RenderUnit::initWebGL = (gl) ->
     @bm = new renderer.LineRenderer gl
+    @bm2 = new renderer.PointRenderer gl
     @bm.upload()
+    @bm2.upload()
     @ready = true
     
 module.exports =

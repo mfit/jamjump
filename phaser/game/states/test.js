@@ -103,9 +103,9 @@ TestState.prototype = {
 
         // Set 1 color bg
 
-        this.r = 250;
-        this.g = 250;
-        this.b = 250;
+        this.r = 51;
+        this.g = 171;
+        this.b = 249;
 
         this.game.stage.backgroundColor = 0;
         this.moving = 0;
