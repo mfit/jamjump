@@ -1,0 +1,8 @@
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var socket = io('http://localhost');
+  socket.on('gup', function (data) {
+    console.log("received an event : ");
+    console.log(data);
+  });
+</script>
