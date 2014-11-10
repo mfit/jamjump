@@ -7,13 +7,13 @@ var frp = require('../frp/frp.js');
 var player = require('../frp/player_behaviors.js');
 var b = require('../frp/world_behaviors.js');
 var input = require('../model/input.js');
+var io = require('socket.io-client');
 
 var toPhaser = require ('../frp/toPhaser.js');
 
 var ru = require ('../render/RenderUnit.js');
 
 var tick = frp.tick
-
 
 function TestState() {}
 
@@ -42,9 +42,12 @@ TestState.prototype = {
         var that = this;
         this.frpWorld = frp.sync(function () {return new b.World(that.game); });
         frp.sync(function() {toPhaser.setup(that.game, that.frpWorld);});
-      
+
         this.input = new input.Input(this.game);
-        
+
+        // Setup multiplayer
+        this._connectMultiplayer();
+
         this.game.world.width = 20000;
         this.game.world.height = 5000;
 
@@ -74,7 +77,7 @@ TestState.prototype = {
             move: this.otherFrpPlayer.moveEvent,
             jump: this.otherFrpPlayer.jumpEvent,
             });
-      
+
         frp.sync(function() {that.keyboardInputP1.mkBehaviors();});
         frp.sync(function() {that.keyboardInputP2.mkBehaviors();});
 
@@ -101,11 +104,11 @@ TestState.prototype = {
 
 
         // Set 1 color bg
-      
+
         this.r = 250;
         this.g = 250;
         this.b = 250;
-      
+
         this.game.stage.backgroundColor = 0;
         this.moving = 0;
         this.moving2 = 0;
@@ -119,8 +122,8 @@ TestState.prototype = {
         this.currentPlayer = 0;
         this.otherCurrentPlayer = 1;
         this.jDown = false;
-      
-      
+
+
         var keyboard = this.game.input.keyboard;
         var k1 = keyboard.addKey(Phaser.Keyboard.ONE)
         var k3 = keyboard.addKey(Phaser.Keyboard.TWO)
@@ -151,12 +154,12 @@ TestState.prototype = {
         var x = keyboard.addKey(Phaser.Keyboard.X)
         var y = keyboard.addKey(Phaser.Keyboard.Y)
 
-        x.onDown.add (function () {         
+        x.onDown.add (function () {
             var that = this;
             this.playerEvents.push (function () {
                 that.frpWorld.makeFaster.send(true)
             })}, this);
-        y.onDown.add (function () {         
+        y.onDown.add (function () {
             var that = this;
             this.playerEvents.push (function () {
                 that.frpWorld.makeSlower.send(true)
@@ -175,7 +178,7 @@ TestState.prototype = {
       // this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
   },
   update: function () {
-        this.game.stage.backgroundColor = 
+        this.game.stage.backgroundColor =
             Math.floor(this.r / 16)*Math.pow(16, 5) + (this.r % 16)*Math.pow(16,4)
             +Math.floor(this.g / 16)*Math.pow(16, 3) + (this.g % 16)*Math.pow(16,2)
             +Math.floor(this.b / 16)*Math.pow(16, 1) + (this.b % 16)*Math.pow(16,0)
@@ -185,9 +188,9 @@ TestState.prototype = {
       var that = this;
 
       var keyboard = this.game.input.keyboard;
-      
+
       var playerEvents = []
-      
+
       if (this.spaceDown == false && keyboard.isDown(Phaser.Keyboard.T)) {
           this.running = !this.running;
           this.spaceDown = true;
@@ -206,22 +209,22 @@ TestState.prototype = {
              var that = this;
              playerEvents.push (function() {
                 that.frpPlayer.moveEvent.send(new b.StopMoveEvent());
-                });         
+                });
              playerEvents.push (function() {
                 that.otherFrpPlayer.moveEvent.send(new b.StopMoveEvent());
                  that.moving = false;
                  that.moving2 = false;
                  that.jumpDown = false;
                  that.jumpDown2 = false;
-                });         
+                });
 
       }
       if (this.jDown === true && !keyboard.isDown(Phaser.Keyboard.J)) {
           this.jDown = false;
       }
-     
+
       for (var i = 0; i < this.frpWorld.players.length; i++) {
-            var x = function (i) { 
+            var x = function (i) {
                 playerEvents.push (function() {
                     that.frpWorld.players[i].setPosition.send(new b.Direction (
                         that.frpWorld.players[i].sprite.body.x, that.frpWorld.players[i].sprite.body.y));
@@ -285,6 +288,20 @@ TestState.prototype = {
       var end = new Date().getTime();
       if (end - start > 10)
         console.warn ("dt", end - start);
+  },
+  _connectMultiplayer : function() {
+    console.log("Attempt connect to server..");
+    var socket = io.connect('http://localhost:1337', {reconnection:false});
+    socket.on('gup', function (data) {
+      console.log("received an event : ");
+      console.log(data);
+    });
+
+    // Handle disconnections manually
+    socket.on('disconnect', function(){
+      console.log("Connection failed / disconneceted..");
+      // socket.connect(callback);
+    });
   }
 };
 
