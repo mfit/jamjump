@@ -1,5 +1,6 @@
-
 'use strict';
+
+var GameSettings = require('../settings/gamesettings.js');
 
 function Boot() {
 }
@@ -14,8 +15,11 @@ Boot.prototype = {
     this.game.first_start = true;
     this.game.scale.startFullScreen(true);
     this.game.state.start('preload');
-      
-  }
+
+    // Set settings object
+    this.game.gameSettings = new GameSettings(this.game);
+    this.game.gameSettings.loadLocal();
+  },
 };
 
 module.exports = Boot;
