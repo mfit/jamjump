@@ -53,12 +53,12 @@ Preload.prototype = {
     this.load.image('background1', 'assets/g1.png');
     this.load.image('background2', 'assets/g2.png');
     this.load.image('background3', 'assets/g3.jpg');
-      
+
     this.load.image('trees', 'assets/w1.png');
     this.load.image('trees_lefthigh', 'assets/w1_1.png');
     this.load.image('trees_righthigh', 'assets/w1_2.png');
     this.load.image('trees_high', 'assets/w1_x.png');
-      
+
     this.load.image('pixel', 'assets/pixel.png');
 
     // Create a game setup object
@@ -78,8 +78,10 @@ Preload.prototype = {
     // Test tiled maps:
     //
     //this.load.image('tileset', 'assets/tileset.png'); // loading the tileset image
+    //var level_file = 'tiled_level.json';
+    var level_file = 'demolevel.json';
     this.load.tilemap('map', 'assets/test.json', null, Phaser.Tilemap.TILED_JSON); // loading the tilemap
-    this.game.tiled_loader = new Tiled.TiledLoader('assets/levels/tiled_level.json', {'tileset':'assets/tileset.png'}, 
+    this.game.tiled_loader = new Tiled.TiledLoader('assets/levels/' + level_file, {'tileset':'assets/tileset.png'},
                                          ['BlockLayer']);
     this.game.tiled_loader.load(this.game.load);
 
