@@ -10,7 +10,8 @@ Toolbar.prototype = {
     // Draw a debug / settings toolbar using jquery
     $("document").ready(function() {
       var tb;
-      tb = $("body").append('<div class="toolbar">');
+      tb = $('<div class="toolbar">');
+      $("body").append(tb);
       tb.append('<button data-func="setsize" data-x="1920" data-y="600">Large</button>');
       tb.append('<button data-func="setsize" data-x="800" data-y="600">Med</button>');
       tb.append('<button data-func="setsize" data-x="640" data-y="400">Small</button>');
