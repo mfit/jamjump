@@ -12,9 +12,9 @@ Toolbar.prototype = {
       var tb;
       tb = $("body").append('<div class="toolbar">');
       tb.append('<button data-func="setsize" data-x="1920" data-y="600">Large</button>');
-      tb.append('<button data-func="setsize" data-x="1024" data-y="768">Med</button>');
+      tb.append('<button data-func="setsize" data-x="800" data-y="600">Med</button>');
       tb.append('<button data-func="setsize" data-x="640" data-y="400">Small</button>');
-        
+
       tb.find("button[data-func='setsize']").click( function() {
         var x,y;
         x = parseInt($(this).data('x'));
