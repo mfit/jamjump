@@ -18,7 +18,7 @@ RenderUnit::_renderWebGL = (renderSession) ->
 
 RenderUnit::initWebGL = (gl) ->
     @bm = new renderer.LineRenderer gl
-    @bm2 = new renderer.PointRenderer gl
+    @bm2 = new renderer.PointRenderer gl, @game.camera.view.width, @game.camera.view.height
     @bm.upload()
     @bm2.upload()
     @ready = true

@@ -213,7 +213,7 @@ class BufferManager
 
     render: ->
         gl = @gl
-        gl.viewport 0, 0, 800, 600
+        gl.viewport 0, 0, @width, @height
         gl.disable gl.BLEND
         gl.disable gl.DEPTH_TEST
         gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
@@ -392,7 +392,7 @@ randomRange = (a, b) ->
     Math.random()*(b - a) + a
 
 class PointRenderer
-    constructor: (@gl) ->
+    constructor: (@gl, @width, @height) ->
         gl = @gl
         @vertexBuffer = gl.createBuffer()
         @indexBuffer = gl.createBuffer()
@@ -434,7 +434,7 @@ class PointRenderer
         gl = @gl
         gl.disable gl.BLEND
         gl.disable gl.DEPTH_TEST
-        gl.viewport (1920/2.0-300/2.0), (300-300/2.0), 300, 300
+        gl.viewport (@width/2.0-300/2.0), (@height-300/2.0), 300, 300
         gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
         gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
 
@@ -457,7 +457,7 @@ class PointRenderer
 
         # restore state
         gl.useProgram oldProg
-        gl.viewport 0, 0, 1920, 600
+        gl.viewport 0, 0, @width, @height
 
 init = (gl) ->
     Phaser.TextureManager = new TextureManager gl
