@@ -84,14 +84,18 @@ TestState.prototype = {
         // Capture Mouse Events ( mostly development / testing .. )
         // this.frpWorld.enableWorldEnvironmentalStuff();
         this.game.input.mouse.mouseDownCallback = function(e) {
-          console.log([e.x, e.y]);
-          var blockcords = that.frpWorld.worldBlocks.value().fromWorldCoords(e.x, e.y)
-          console.log(blockcords);
-          // TODO : transform viewpoint-coords to world coords
-          //var gridPos = that.frpWorld.worldBlocks.current_value.fromWorldCoords(e.x, e.y);
-          // console.log(gridPos);
-          // console.log(that.frpWorld.worldBlocks);
-          // that.frpWorld.blockGrowthAt.send(gridPos);
+          //console.log([e.x, e.y]);
+          //console.log(game.camera.position);
+          var wp = {x: e.x + game.camera.position.x,
+                      y: e.y + game.camera.position.y};
+          var gridpos = that.frpWorld.worldBlocks.value().fromWorldCoords(wp.x, wp.y)
+          console.log(wp);
+          console.log(gridpos);
+          frp.sync(function() {
+            that.frpWorld.worldBlocks.addBlock.send({x:gridpos.x,
+                                                  y:gridpos.y,
+                                                  block: that.frpWorld.worldBlocks.value().blockFactory('default')})
+          });
         };
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
