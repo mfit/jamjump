@@ -336,6 +336,7 @@ class WalkAnimation
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12
                 @running = false
+                console.log this
                 @leftover = 0
                 return
 

@@ -237,7 +237,7 @@ class Movement
         airEvent = inAir.updates().filter ((air) -> air == true)
         @value.landedOnBlockOnce = frp.onEventMakeEvent airEvent, (_) =>
             return @player.landedOnBlock.once()
-        @value.startMove = startMove
+        @value.startMove = canStartMove
         @value.stopMove = wantsStopMoveEvent
 
         return @value
