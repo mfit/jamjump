@@ -32,7 +32,15 @@ setup = (@game, world) ->
                         player.touchedWall.send (-1)
                     if sprite.body.touching.right == true
                         player.touchedWall.send 1
-                ) )
+
+                # test for winning collision
+                game.physics.arcade.collide world.goaltree, player.sprite, (pl, gtree) =>
+
+                    # change tree's texture:
+                    console.log "win!"
+                    console.log pl
+                    gtree.loadTexture 'treelarge2'
+            ) )
         # side effects
         #(s player).listen ((v) ->)
 
@@ -87,15 +95,19 @@ setupTrees = (game, world) ->
 
     world.trees_high.shader = new shaders.IntensityFilter 0, {x:1, y:1, z:0.8}
 
-    world.goaltree = game.add.sprite 0, 0, 'treelarge1'
+    world.goaltree = game.add.sprite 9000, 2250, 'treelarge1'
+    world.goaltree.enableBody = true
+    game.physics.enable(world.goaltree, Phaser.Physics.ARCADE, true);
+    world.goaltree.scale.x = 2
+    world.goaltree.scale.y = 2
 
 
     world.trees.add world.tree
     world.trees.add world.trees_high
     world.trees.add world.goaltree
 
-    x = new cfgFrp.ConfigBehavior "tree_x", 9000
-    y = new cfgFrp.ConfigBehavior "tree_y", 2250
+    x = new cfgFrp.ConfigBehavior "tree_x", 8870
+    y = new cfgFrp.ConfigBehavior "tree_y", 2050
 
     x.updates().listen (x) ->
         world.goaltree.x = x
@@ -133,6 +145,8 @@ setupBlockManager = (game, world) ->
         x = blockInfo.x
         y = blockInfo.y
         block = blockInfo.block
+        console.log "add block"
+        console.log block
 
         coords = bm.toWorldCoords x, y
 
@@ -361,7 +375,7 @@ class WalkAnimation
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12
                 @running = false
-                console.log this
+                # console.log this
                 @leftover = 0
                 return
 
@@ -375,13 +389,13 @@ class WalkAnimation
                 @player.sprite.animations.frame = run_startfrm + ((@player.sprite.animations.currentFrame.index - run_startfrm + 1) % run_frmslen)
 
             if @jumpingUp == true
-                console.log "jumping", @player.sprite.animations.currentFrame.index
+                # console.log "jumping", @player.sprite.animations.currentFrame.index
                 if @player.sprite.animations.currentFrame.index == 13
                     @player.sprite.animations.frame = 14
                 else
                     @player.sprite.animations.frame = 13
             else if @falling == true
-                console.log "falling", @player.sprite.animations.currentFrame.index
+                # console.log "falling", @player.sprite.animations.currentFrame.index
                 if @player.sprite.animations.currentFrame.index == 15
                     @player.sprite.animations.frame = 16
                 else
