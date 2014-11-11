@@ -1,0 +1,20 @@
+class GameSettings
+  constructor: (game) ->
+    @game = game
+    @settings = {}
+    @behaviors = {}
+  setSize: (x,y) ->
+    @game.width = x
+    @game.height = y
+    @game.renderer.resize(x, y)
+    @game.camera.view.width = x
+    @game.camera.view.height = y
+  saveLocal: ->
+    @settings.width = game.width
+    @settings.height = game.height
+    sessionStorage.setItem 'gamewidth', @settings.width
+    sessionStorage.setItem 'gameheight', @settings.height
+    for own key, value of @behaviours
+      sessionStorage.setItem key, value.value()
+
+module.exports = GameSettings
