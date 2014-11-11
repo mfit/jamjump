@@ -47,8 +47,8 @@ TestState.prototype = {
         // Setup multiplayer
         this._connectMultiplayer();
 
-        this.game.world.width = 20000;
-        this.game.world.height = 5000;
+        this.game.world.width = 10000;
+        this.game.world.height = 2500;
 
         this.frpPlayer = this.frpWorld.players[0];
         this.otherFrpPlayer = this.frpWorld.players[1];
@@ -79,7 +79,6 @@ TestState.prototype = {
 
         frp.sync(function() {that.keyboardInputP1.mkBehaviors();});
         frp.sync(function() {that.keyboardInputP2.mkBehaviors();});
-
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
@@ -126,7 +125,7 @@ TestState.prototype = {
                         +Math.floor(b / 16)*Math.pow(16, 1) + (b % 16)*Math.pow(16,0)
                         ;
                   }
-                });     
+                });
             change.listen (function (f) {f()});
             });
 
@@ -164,9 +163,9 @@ TestState.prototype = {
       this.running = true;
       this.spaceDown = false;
       this.renderSettingsInitialized = 0;
-      
+
       // HACK HACK
-      var old = Phaser.Stage.prototype.visibilityChange 
+      var old = Phaser.Stage.prototype.visibilityChange
       var that = this;
       this.hasFocus = true;
       Phaser.Stage.prototype.visibilityChange = function (event) {
