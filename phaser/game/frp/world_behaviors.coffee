@@ -1,5 +1,6 @@
 #frp = require '../frp/behavior.js'
 frp = require '../frp/frp.js'
+frpCfg = require '../frp/frp_settings.js'
 tick = frp.tick
 preTick = frp.preTick
 postTick = frp.postTick
@@ -133,24 +134,16 @@ class Camera
         @shakeIt()
 
     shakeIt: ->
-        @rotating = frp.pure 0
-        # @shakeMe = new frp.EventStream
-
-        # reset = new frp.EventStream
-        # effects = [
-        #     reset.constMap (new frp.Behavior 0)
-        #     @shakeMe.map ((v) =>
-        #         timer = (frp.mkCountdown 300)
-        #         counter = frp.accum 10, (@tick.map ((t) -> (a) -> a - t/10.0))
-        #         rotation = counter.map ((v) -> (Math.sin v) / 16) # frp.hold 0 (@tick.map ((t) -> Math.sin t)) #frp.accum 0 effects
-        #         timer.listen ((_) -> reset.send true)
-        #         return rotation
-        #     )
-        # ]
-
-        # rotating = frp.hold (new frp.Behavior 0), (frp.mergeAll effects)
-        # @rotating = frp.switchBeh rotating
-        #rotating.updates().listen ((v) => @game.world.rotation = v)
+        @amplitude = new frpCfg.ConfigBehavior "Amplitude", 0.05
+        @shakeMe = new frp.EventStream
+        @rotating = frp.onEventMakeBehavior 0, @shakeMe, (_) =>
+            [t, end] = frp.tickSplitTime @tick, 100
+            end = end.once()
+            totalTime = frp.accumAll 0, [
+                (t.map (t) -> (oldT) -> oldT + t)
+                end.constMap (oldT) -> 0
+                ]
+            return totalTime.apply @amplitude, ((t, a) -> a*(100 - t) - Math.sin t)
 
 class World
     constructor: () ->

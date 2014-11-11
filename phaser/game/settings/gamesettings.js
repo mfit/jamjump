@@ -34,7 +34,7 @@ GameSettings.prototype = {
     }
     for (var behName in this.behaviors) {
         if (sessionStorage.getItem(behName) != null)
-            this.behaviors[behName].update(parseInt(sessionStorage.getItem(behName))); 
+            this.behaviors[behName].update(parseFloat(sessionStorage.getItem(behName))); 
     }
   },
 };

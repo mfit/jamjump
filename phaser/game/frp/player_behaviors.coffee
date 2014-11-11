@@ -220,17 +220,26 @@ class Movement
         gravVel = new Velocity gravTick, mods, 2000, gravity
         fallV = frp.hold (Vector.null()), (gravVel.updates().map ((v) -> new Vector 0, v))
 
-
         @player.pushVel = {ref:null}
         @player.pullVel = {ref:null}
 
         @value = frp.apply value, fallV, (x, y) -> Vector.add x, y
         @value = frp.apply @value, @player.pushVel, (x, y) -> Vector.add x, y
         @value = frp.apply @value, @player.pullVel, (x, y) -> Vector.add x, y
+
+        updatesInAir = @value.updates().gate inAir
+        turningPoint = updatesInAir.filter (v) -> (Math.abs v.y) < 10
+    
         # FIXME
         @value.direction = @direction
+        @value.turningPoint = turningPoint
+
+        airEvent = inAir.updates().filter ((air) -> air == true)
+        @value.landedOnBlockOnce = frp.onEventMakeEvent airEvent, (_) =>
+            return @player.landedOnBlock.once()
         @value.startMove = startMove
         @value.stopMove = wantsStopMoveEvent
+
         return @value
 
 lowerCap = (v, cap) -> if v < cap then return cap else v

@@ -168,10 +168,20 @@ TestState.prototype = {
       // HACK HACK
       var old = Phaser.Stage.prototype.visibilityChange 
       var that = this;
+      this.hasFocus = true;
       Phaser.Stage.prototype.visibilityChange = function (event) {
-          old(event)
+          old(event);
+        console.log(event.type);
           if (event.type == 'focus') {
-              that.input.removeKeys();
+              if (that.hasFocus) {
+                console.log("remove keys");
+                that.input.removeKeys();
+                that.hasFocus = false;
+              } else {
+                console.log("mkkeys");
+                that.input.mkKeys();
+                that.hasFocus = true;
+              }
           }
       }
   },
@@ -260,7 +270,7 @@ TestState.prototype = {
 
       if (keyboard.isDown(Phaser.Keyboard.F)) {
           playerEvents.push (function() {
-              //that.frpWorld.camera.shakeMe.send (true)
+              that.frpWorld.camera.shakeMe.send (true)
               });
       }
 

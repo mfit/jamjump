@@ -31,7 +31,8 @@ initialize = (settings, toolbar) ->
 
         cb = (beh, inp) -> ->
             if beh.settings.type == 'number'
-                frp.sync -> beh.update parseInt inp.value
+                console.log (parseFloat inp.value)
+                frp.sync -> beh.update parseFloat inp.value
                 settings.saveLocal()
         inp.on 'input', (cb beh, (opt.find "input[name='#{behaviorName}']")[0])
 

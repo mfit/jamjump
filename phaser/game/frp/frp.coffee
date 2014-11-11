@@ -463,6 +463,19 @@ applicative = (bf_, bb_) ->
 
     newB = null
     gl = ->
+        if bf_.hasOwnProperty 'ref'
+            bf_ = bf_.ref
+        if bb_.hasOwnProperty 'ref'
+            bb_ = bb_.ref
+        if (e1.hasOwnProperty 'ref') && typeof e2.ref != 'function'
+            e1 = e1.ref
+        if (e1.hasOwnProperty 'ref') && typeof e1.ref == 'function'
+            e1 = e1.ref
+        if (e2.hasOwnProperty 'ref') && typeof e2.ref != 'function'
+            e2 = e2.ref
+        if (e2.hasOwnProperty 'ref') && typeof e2.ref == 'function'
+            e2 = e2.ref()
+
         fRef = bf_.sample.unSample()
         aRef = bb_.sample.unSample()
         [l, push, node] = EventStream.newEventImpl()

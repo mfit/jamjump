@@ -1,5 +1,6 @@
 render = require '../render/render.js'
 frp = require '../frp/frp.js'
+log = frp.log
 tick = frp.tick
 preTick = frp.preTick
 postTick = frp.postTick
@@ -40,23 +41,31 @@ setupCamera = (@game, world, camera) ->
     zoneX = 200
     zoneY = 100
 
+    @camPos = {x:@game.camera.x, y:@game.camera.y}
+
     world.players[0].position.updates().listen ((pos) =>
-        distance = @game.camera.x - pos.x + @game.camera.view.width/2.0
-        distance_y = @game.camera.y - pos.y + @game.camera.view.height/2.0
+        distance = @camPos.x - pos.x + @game.camera.view.width/2.0
+        distance_y = @camPos.y - pos.y + @game.camera.view.height/2.0
         if (Math.abs distance) > zoneX
              if (distance > 0)
-                @game.camera.x = @game.camera.x + (-distance + zoneX)
+                @camPos.x = @camPos.x + (-distance + zoneX)
              else if distance < 0
-                @game.camera.x = @game.camera.x + (-distance - zoneX)
+                @camPos.x = @camPos.x + (-distance - zoneX)
         if (Math.abs distance_y) > zoneY
             if distance_y < 0
-                @game.camera.y += (-distance_y - zoneY)
+                @camPos.y += (-distance_y - zoneY)
             else if distance_y > 0
-                @game.camera.y += (-distance_y + zoneY)
+                @camPos.y += (-distance_y + zoneY)
+
+        @game.camera.x = @camPos.x + @offset
+        @game.camera.y = @camPos.y + @offset
         )
 
+    @offset = 0
     # SHAKIN
-    camera.rotating.updates().listen ((v) => @game.world.rotation = v)
+    camera.rotating.updates().listen (v) =>
+        @offset = v
+        @game.camera.x = @camPos.x + @offset
 
 setupTrees = (game, world) ->
     world.trees = game.add.group();
@@ -258,7 +267,9 @@ setupPlayer = (player, game, world) ->
     t2.listen ((v) ->)
 
 setupMovement = (player, movement) ->
-    movement.walkAnim = WalkAnimation.mkBehavior player, tick, movement.startMove, movement.stopMove
+    movement.walkAnim = WalkAnimation.mkBehavior player, tick,
+        movement.startMove, movement.stopMove
+        player.jumpEvent, movement.turningPoint, movement.landedOnBlockOnce
     movement.direction.updates().listen ((dir) =>
         player.sprite.scale.set (-dir.x), 1
         if ((-dir.x) == 1) and ((-dir.x) != player.oldDir)
@@ -313,14 +324,14 @@ class WalkAnimation
         @player.sprite.animations.loop = true
         @running = false
         @advance = false
+        @jumpingUp = false
+        @falling = false
 
         @msPerFrame = 80
         @leftover = 0
 
     tick: (dt) ->
         # FIXME remove me when animations for 2nd player exist
-        if @player.sprite.animations.currentFrame.index + 1 == @player.sprite.animations.totalFrames
-            @player.sprite.animations.frame = 0
         if @leftover + dt > @msPerFrame
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12
@@ -334,11 +345,24 @@ class WalkAnimation
                 @leftover = 0
                 return
 
-            console.log @player.sprite.animations.currentFrame.index
-            if @player.sprite.animations.currentFrame.index == 11
-                @player.sprite.animations.frame = 0
-            else
-                @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
+            if @running
+                if @player.sprite.animations.currentFrame.index == 11
+                    @player.sprite.animations.frame = 0
+                else
+                    @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
+
+            if @jumpingUp == true
+                console.log "jumping", @player.sprite.animations.currentFrame.index
+                if @player.sprite.animations.currentFrame.index == 13
+                    @player.sprite.animations.frame = 14
+                else
+                    @player.sprite.animations.frame = 13
+            else if @falling == true
+                console.log "falling", @player.sprite.animations.currentFrame.index
+                if @player.sprite.animations.currentFrame.index == 15
+                    @player.sprite.animations.frame = 16
+                else
+                    @player.sprite.animations.frame = 15               
             @leftover = @leftover - @msPerFrame
 
         @leftover += dt
@@ -348,16 +372,34 @@ class WalkAnimation
         @advance = true
         @running = true
 
+    startJump: () ->
+        @player.sprite.animations.frame = 13
+        @jumpingUp = true
+        @running = false
+        @advance = false
+
+    fall: () ->
+        @player.sprite.animations.frame = 15
+        @jumpingUp = false
+        @falling = true
+
+    land: () ->
+        @player.sprite.animations.frame = 12
+        @falling = false
+        @jumpingUp = false
+
     stopRun: () ->
         @advance = false
 
     isRunning: -> @running
+    doAnim: -> @running || @falling || @jumpingUp
 
-    @mkBehavior: (player, tick, startMove, stopMove) ->
+    @mkBehavior: (player, tick, startMove, stopMove, startJump, reachedTurningPoint, landed) ->
         # we only need to step the animation when it is running
         anim = {ref:null}
         isRunning = frp.mapB anim, ((anim) -> anim.isRunning())
-        tickWhenRunning = tick.gate isRunning
+        doAnim = frp.mapB anim, ((anim) -> anim.doAnim())
+        tickWhenRunning = tick.gate doAnim
 
         startMove = startMove.gate (isRunning.not())
 
@@ -367,6 +409,15 @@ class WalkAnimation
                 return anim
             stopMove.constMap (anim) ->
                 anim.stopRun()
+                return anim
+            startJump.constMap (anim) ->
+                anim.startJump()
+                return anim
+            reachedTurningPoint.constMap (anim) ->
+                anim.fall()
+                return anim
+            landed.constMap (anim) ->
+                anim.land()
                 return anim
             tickWhenRunning.map (dt) -> (anim) ->
                 anim.tick dt
