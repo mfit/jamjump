@@ -85,8 +85,8 @@ TestState.prototype = {
         // this.frpWorld.enableWorldEnvironmentalStuff();
         this.game.input.mouse.mouseDownCallback = function(e) {
           console.log([e.x, e.y]);
-          console.log(that.frpWorld.worldBlocks);
-          console.log(that.frpWorld.worldBlocks.current_value);
+          var blockcords = that.frpWorld.worldBlocks.value().fromWorldCoords(e.x, e.y)
+          console.log(blockcords);
           // TODO : transform viewpoint-coords to world coords
           //var gridPos = that.frpWorld.worldBlocks.current_value.fromWorldCoords(e.x, e.y);
           // console.log(gridPos);
