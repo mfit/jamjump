@@ -86,8 +86,8 @@ TestState.prototype = {
         this.game.input.mouse.mouseDownCallback = function(e) {
           //console.log([e.x, e.y]);
           //console.log(game.camera.position);
-          var wp = {x: e.x + game.camera.position.x,
-                      y: e.y + game.camera.position.y};
+          var wp = {x: e.x + game.camera.position.x - game.camera.view.width / 2
+                      y: e.y + game.camera.position.y - game.camera.view.height / 2};
           var gridpos = that.frpWorld.worldBlocks.value().fromWorldCoords(wp.x, wp.y)
           console.log(wp);
           console.log(gridpos);

@@ -145,8 +145,6 @@ setupBlockManager = (game, world) ->
         x = blockInfo.x
         y = blockInfo.y
         block = blockInfo.block
-        console.log "add block"
-        console.log block
 
         coords = bm.toWorldCoords x, y
 
