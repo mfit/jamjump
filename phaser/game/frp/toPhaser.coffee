@@ -236,7 +236,7 @@ setupPlayer = (player, game, world) ->
     else
         playerBodyRight2 player
 
-    setupCollisionBox (player.pushBox)
+    #setupCollisionBox (player.pushBox)
 
     setupMovement player, player.movement
 
