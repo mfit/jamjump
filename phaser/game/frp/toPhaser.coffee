@@ -87,16 +87,20 @@ setupTrees = (game, world) ->
 
     world.trees_high.shader = new shaders.IntensityFilter 0, {x:1, y:1, z:0.8}
 
+    world.goaltree = game.add.sprite 0, 0, 'treelarge1'
+
+
     world.trees.add world.tree
     world.trees.add world.trees_high
+    world.trees.add world.goaltree
 
-    x = new cfgFrp.ConfigBehavior "tree_x", 0
-    y = new cfgFrp.ConfigBehavior "tree_y", 0
+    x = new cfgFrp.ConfigBehavior "tree_x", 9000
+    y = new cfgFrp.ConfigBehavior "tree_y", 2250
 
     x.updates().listen (x) ->
-        world.trees.x = x
+        world.goaltree.x = x
     y.updates().listen (y) ->
-        world.trees.y = y
+        world.goaltree.y = y
 
     world.tick.listen ((t) =>
             width = world.trees_high.texture.width

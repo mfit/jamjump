@@ -59,6 +59,9 @@ Preload.prototype = {
     this.load.image('trees_righthigh', 'assets/w1_2.png');
     this.load.image('trees_high', 'assets/w1_x.png');
 
+    this.load.image('treelarge1', 'assets/tree1.png');
+    this.load.image('treelarge1', 'assets/tree2.png');
+
     this.load.image('pixel', 'assets/pixel.png');
 
     // Create a game setup object
