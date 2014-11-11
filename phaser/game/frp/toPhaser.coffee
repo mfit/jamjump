@@ -350,6 +350,9 @@ class WalkAnimation
 
     tick: (dt) ->
         # FIXME remove me when animations for 2nd player exist
+        run_startfrm = 0
+        run_frmslen = 12
+
         if @leftover + dt > @msPerFrame
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12
@@ -365,10 +368,7 @@ class WalkAnimation
                 return
 
             if @running
-                if @player.sprite.animations.currentFrame.index == 11
-                    @player.sprite.animations.frame = 0
-                else
-                    @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
+                @player.sprite.animations.frame = run_startfrm + ((@player.sprite.animations.currentFrame.index - run_startfrm + 1) % run_frmslen)
 
             if @jumpingUp == true
                 console.log "jumping", @player.sprite.animations.currentFrame.index
