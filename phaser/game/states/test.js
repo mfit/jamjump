@@ -80,6 +80,20 @@ TestState.prototype = {
         frp.sync(function() {that.keyboardInputP1.mkBehaviors();});
         frp.sync(function() {that.keyboardInputP2.mkBehaviors();});
 
+
+        // Capture Mouse Events ( mostly development / testing .. )
+        // this.frpWorld.enableWorldEnvironmentalStuff();
+        this.game.input.mouse.mouseDownCallback = function(e) {
+          console.log([e.x, e.y]);
+          console.log(that.frpWorld.worldBlocks);
+          console.log(that.frpWorld.worldBlocks.current_value);
+          // TODO : transform viewpoint-coords to world coords
+          //var gridPos = that.frpWorld.worldBlocks.current_value.fromWorldCoords(e.x, e.y);
+          // console.log(gridPos);
+          // console.log(that.frpWorld.worldBlocks);
+          // that.frpWorld.blockGrowthAt.send(gridPos);
+        };
+
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
 
