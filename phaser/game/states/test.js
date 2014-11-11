@@ -1,6 +1,5 @@
 
 'use strict';
-var Phaser = require('../../phaser/dist/phaser-no-libs.js');
 var Tiled = require('../model/tiled.js');
 var WorldBlocks = require('../model/world');
 var frp = require('../frp/frp.js');
@@ -12,6 +11,8 @@ var io = require('socket.io-client');
 var toPhaser = require ('../frp/toPhaser.js');
 
 var ru = require ('../render/RenderUnit.js');
+var frpCfg = require ('../frp/frp_settings.js');
+var renderSettings = require ('../settings/RenderSettings.js');
 
 var tick = frp.tick
 
@@ -100,14 +101,35 @@ TestState.prototype = {
             //this.game.rootGroup.add(this.frpWorld.players[i].pushBox.sprite);
         }
 
-
         // Set 1 color bg
 
-        this.r = 51;
-        this.g = 171;
-        this.b = 249;
+        var that = this;
+        frp.sync(function() {
+            that.r = new frpCfg.ConfigBehavior ("bg-red", 51);
+            that.g = new frpCfg.ConfigBehavior ("bg-green", 171);
+            that.b = new frpCfg.ConfigBehavior ("bg-blue", 249);
+        });
 
-        this.game.stage.backgroundColor = 0;
+        frpCfg.initialize(this.game.gameSettings, this.game.toolbar);
+
+        frp.sync(function() {
+            var anyChanged = frp.mergeAll ([
+               that.r.values(),
+               that.g.updates(),
+               that.b.updates(),
+               ])
+            var change = anyChanged.snapshotMany ([that.r, that.g, that.b], function (_, r, g, b) {
+                  return function () {
+                    that.game.stage.backgroundColor =
+                        Math.floor(r / 16)*Math.pow(16, 5) + (r % 16)*Math.pow(16,4)
+                        +Math.floor(g / 16)*Math.pow(16, 3) + (g % 16)*Math.pow(16,2)
+                        +Math.floor(b / 16)*Math.pow(16, 1) + (b % 16)*Math.pow(16,0)
+                        ;
+                  }
+                });     
+            change.listen (function (f) {f()});
+            });
+
         this.moving = 0;
         this.moving2 = 0;
 
@@ -123,31 +145,6 @@ TestState.prototype = {
 
 
         var keyboard = this.game.input.keyboard;
-        var k1 = keyboard.addKey(Phaser.Keyboard.ONE)
-        var k3 = keyboard.addKey(Phaser.Keyboard.TWO)
-        var k5 = keyboard.addKey(Phaser.Keyboard.THREE)
-        var k2 = keyboard.addKey(Phaser.Keyboard.FOUR)
-        var k4 = keyboard.addKey(Phaser.Keyboard.FIVE)
-        var k6 = keyboard.addKey(Phaser.Keyboard.SIX)
-        var step = 5;
-        k1.onDown.add (function() {
-            this.r += step;
-        }, this);
-        k2.onDown.add (function() {
-            this.r -= step;
-        }, this);
-        k3.onDown.add (function() {
-            this.g += step;
-        }, this);
-        k4.onDown.add (function() {
-            this.g -= step;
-        }, this);
-        k5.onDown.add (function() {
-            this.b += step;
-        }, this);
-        k6.onDown.add (function() {
-            this.b -= step;
-        }, this);
 
         var x = keyboard.addKey(Phaser.Keyboard.X)
         var y = keyboard.addKey(Phaser.Keyboard.Y)
@@ -166,21 +163,35 @@ TestState.prototype = {
       this.playerEvents = [];
       this.running = true;
       this.spaceDown = false;
+      this.renderSettingsInitialized = 0;
+      
+      // HACK HACK
+      var old = Phaser.Stage.prototype.visibilityChange 
+      var that = this;
+      Phaser.Stage.prototype.visibilityChange = function (event) {
+          old(event)
+          if (event.type == 'focus') {
+              that.input.removeKeys();
+          }
+      }
   },
   getId: function() {
       return -1;
   },
   render: function () {
+      if (this.renderSettingsInitialized === 0) {
+          this.renderSettingsInitialized = 1;
+      }
+      else if (this.renderSettingsInitialized === 1) {
+          this.renderSettingsInitialized = -1;
+          renderSettings.initialize(this.game.gameSettings, this.game.toolbar);
+      }
       this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
       this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");
-      this.game.debug.text(this.r.toString() + "/" + this.g.toString() + "/" + this.b.toString(), 2, 42, "#00ff00");
   },
   update: function () {
-        this.game.stage.backgroundColor =
-            Math.floor(this.r / 16)*Math.pow(16, 5) + (this.r % 16)*Math.pow(16,4)
-            +Math.floor(this.g / 16)*Math.pow(16, 3) + (this.g % 16)*Math.pow(16,2)
-            +Math.floor(this.b / 16)*Math.pow(16, 1) + (this.b % 16)*Math.pow(16,0)
-            ;
+
+
       var start = new Date().getTime();
       //this.wb.update();
       var that = this;
@@ -249,7 +260,7 @@ TestState.prototype = {
 
       if (keyboard.isDown(Phaser.Keyboard.F)) {
           playerEvents.push (function() {
-              that.frpWorld.camera.shakeMe.send (true)
+              //that.frpWorld.camera.shakeMe.send (true)
               });
       }
 

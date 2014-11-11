@@ -3,6 +3,7 @@
 function GameSettings(game) {
   this.game = game;
   this.settings = {};
+  this.behaviors = {};
 }
 
 GameSettings.prototype = {
@@ -18,6 +19,9 @@ GameSettings.prototype = {
     this.settings.height = game.height;
     sessionStorage.setItem('gamewidth', this.settings.width);
     sessionStorage.setItem('gameheight', this.settings.height);
+    for (var behName in this.behaviors) {
+      sessionStorage.setItem(behName, this.behaviors[behName].value());
+    }
   },
   loadLocal: function() {
     var x,y;
@@ -27,6 +31,10 @@ GameSettings.prototype = {
       this.settings.width = x;
       this.settings.height = y;
       this.setSize(x, y);
+    }
+    for (var behName in this.behaviors) {
+        if (sessionStorage.getItem(behName) != null)
+            this.behaviors[behName].update(parseInt(sessionStorage.getItem(behName))); 
     }
   },
 };

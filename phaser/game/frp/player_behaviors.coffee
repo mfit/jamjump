@@ -1,5 +1,6 @@
 frp = require '../frp/frp.js'
 shaders = require '../frp/shaders.js'
+cfgFrp = require '../frp/frp_settings.js'
 
 log = frp.log
 preTick = frp.preTick
@@ -154,7 +155,7 @@ class Movement
         canStartMove = startMove.gate (jumping.not())
         currentDir = frp.hold Direction.null(), (canStartMove.map (e) -> e.dir)
 
-        @speed = 300
+        @speed = new cfgFrp.ConfigBehavior "#{@player.name} speed", 300
 
         running = frp.holdAll false, [
             canStartMove.constMap true
@@ -166,8 +167,8 @@ class Movement
         
         playerJumping = @player.jumping
         velXmods = frp.mergeAll [
-            canStartMove.map (dir) ->
-                (oldV) -> dir.dir.x * 300
+            canStartMove.snapshot @speed, (dir, speed) =>
+                (oldV) -> dir.dir.x * speed
             playerJumping.value2.map ((v) -> (old) -> old + v.x)
             ]
 

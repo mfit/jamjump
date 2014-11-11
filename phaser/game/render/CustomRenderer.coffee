@@ -1,3 +1,5 @@
+settings = require '../settings/RenderSettings.js'
+    
 dbg = true
 
 debug = (txt) ->
@@ -338,7 +340,9 @@ class LineRenderer
         gl.useProgram oldProg
 
 class PointShader
-    constructor: (gl) ->
+    constructor: (@gl) ->
+        settings.addShader "Sun", this
+        @recompile = false
         colors = [
             [0.1, 255, 251, 221]
             [0.3, 255, 238, 10]
@@ -346,7 +350,7 @@ class PointShader
             [99.1, 242, 144, 0]
             ]
 
-        fs = [
+        @fs = [
             'precision mediump float;'
             'varying vec2 vPos;'
             'void main(void) {'
@@ -354,14 +358,12 @@ class PointShader
             ]
         for color in colors
             [d, r, g, b] = color
-            fs.push "if (l < #{d}) {"
-            fs.push "    gl_FragColor = vec4(#{r}.0/255.0, #{g}.0/255.0, #{b}.0/255.0, 1);"
-            fs.push "    return;}"
-        fs.push '}'
+            @fs.push "if (l < #{d}) {"
+            @fs.push "    gl_FragColor = vec4(#{r}.0/255.0, #{g}.0/255.0, #{b}.0/255.0, 1);"
+            @fs.push "    return;}"
+        @fs.push '}'
 
-        console.log fs
-
-        @program = PIXI.compileProgram gl, [
+        @vs = [
             'attribute vec2 vertexPosition;'
 
             'uniform float time;'
@@ -379,7 +381,13 @@ class PointShader
             '    gl_PointSize = 10.0;'
             '    vPos = pos;'
             '}'
-            ], fs
+        ]
+
+        @program = PIXI.compileProgram @gl, @vs, @fs
+    doRecompile: ->
+        @program = PIXI.compileProgram @gl, @vs, @fs
+        @recompile = false
+
 randomRange = (a, b) ->
     Math.random()*(b - a) + a
 
@@ -406,7 +414,13 @@ class PointRenderer
         gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
         gl.bufferData gl.ARRAY_BUFFER, new Float32Array(@vertexData), gl.STATIC_DRAW
 
-        # save state
+        @updateAttribsAndUniforms()
+
+        @localTime = 0
+
+    updateAttribsAndUniforms: ->
+        gl = @gl
+         # save state
         oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
 
         gl.useProgram @shader.program
@@ -415,8 +429,6 @@ class PointRenderer
 
         # restore state
         gl.useProgram oldProg
-
-        @localTime = 0
 
     render: ->
         gl = @gl
@@ -428,6 +440,9 @@ class PointRenderer
 
         # save state
         oldProg = gl.getParameter(gl.CURRENT_PROGRAM)
+        if @shader.recompile
+            @shader.doRecompile()
+            @updateAttribsAndUniforms()
         gl.useProgram @shader.program
         gl.vertexAttribPointer @vertexPos, 2, gl.FLOAT, false, 8, 0
         gl.enableVertexAttribArray @vertexPos

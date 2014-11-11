@@ -318,6 +318,9 @@ class WalkAnimation
         @leftover = 0
 
     tick: (dt) ->
+        # FIXME remove me when animations for 2nd player exist
+        if @player.sprite.animations.currentFrame.index + 1 == @player.sprite.animations.totalFrames
+            @player.sprite.animations.frame = 0
         if @leftover + dt > @msPerFrame
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12

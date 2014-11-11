@@ -13,7 +13,9 @@ class Input
         for key in keys
             @keyUpEvent[key] = new frp.EventStream
             @keyDownEvent[key] = new frp.EventStream
+        @mkKeys()
 
+    mkKeys: ->
         @keys = {}
         @keys['A'] = @keyboard.addKey Phaser.Keyboard.A
         @keys['B'] = @keyboard.addKey Phaser.Keyboard.B
@@ -52,6 +54,34 @@ class Input
                 d = new Date()
                 frp.sync (=> @keyUpEvent[k].send d)
                 ) key
+
+    removeKeys: ->
+        @keys['A'] = @keyboard.removeKey Phaser.Keyboard.A
+        @keys['B'] = @keyboard.removeKey Phaser.Keyboard.B
+        @keys['C'] = @keyboard.removeKey Phaser.Keyboard.C
+        @keys['D'] = @keyboard.removeKey Phaser.Keyboard.D
+        @keys['E'] = @keyboard.removeKey Phaser.Keyboard.E
+        @keys['F'] = @keyboard.removeKey Phaser.Keyboard.F
+        @keys['G'] = @keyboard.removeKey Phaser.Keyboard.G
+        @keys['H'] = @keyboard.removeKey Phaser.Keyboard.H
+        @keys['I'] = @keyboard.removeKey Phaser.Keyboard.I
+        @keys['J'] = @keyboard.removeKey Phaser.Keyboard.J
+        @keys['K'] = @keyboard.removeKey Phaser.Keyboard.K
+        @keys['L'] = @keyboard.removeKey Phaser.Keyboard.L
+        @keys['M'] = @keyboard.removeKey Phaser.Keyboard.M
+        @keys['N'] = @keyboard.removeKey Phaser.Keyboard.N
+        @keys['O'] = @keyboard.removeKey Phaser.Keyboard.O
+        @keys['P'] = @keyboard.removeKey Phaser.Keyboard.P
+        @keys['Q'] = @keyboard.removeKey Phaser.Keyboard.Q
+        @keys['R'] = @keyboard.removeKey Phaser.Keyboard.R
+        @keys['S'] = @keyboard.removeKey Phaser.Keyboard.S
+        @keys['T'] = @keyboard.removeKey Phaser.Keyboard.T
+        @keys['U'] = @keyboard.removeKey Phaser.Keyboard.U
+        @keys['V'] = @keyboard.removeKey Phaser.Keyboard.V
+        @keys['W'] = @keyboard.removeKey Phaser.Keyboard.W
+        @keys['X'] = @keyboard.removeKey Phaser.Keyboard.X
+        @keys['Y'] = @keyboard.removeKey Phaser.Keyboard.Y
+        @keys['Z'] = @keyboard.removeKey Phaser.Keyboard.Z
 
 # differs from ControllerInput in the way the events fire
 class KeyboardInput
