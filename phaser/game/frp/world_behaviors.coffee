@@ -62,6 +62,10 @@ class BlockManager
         @blocks = {}
         @blockSize = 50
 
+        # String to class mapping
+        @createmap =
+            default: DefaultBlock
+
     toWorldCoords: (x, y) ->
         return {x:x*@blockSize, y:y*@blockSize}
 
@@ -73,6 +77,9 @@ class BlockManager
     canAddBlock: (x, y) ->
         return false if @blocks.hasOwnProperty(y) && @blocks[y].hasOwnProperty x
         return true
+
+    blockFactory: (btype) ->
+        block = new @createmap[btype]
 
     addBlock: (x, y, block) ->
         if not @canAddBlock x, y
@@ -161,7 +168,7 @@ class World
             @makeFaster.constMap ((m) -> m * 2)
             @makeSlower.constMap ((m) -> m / 2)
             ])
-    
+
         playerTick = @tick.snapshot @mod, ((t, mod) -> t * mod)
         @players = [
             new player.Player playerTick, "p1", 'runner1'
@@ -180,7 +187,7 @@ class World
         #@players[0].pullVel.ref = frp.pure (player.Vector.null());
 
         #@players[0].pushBox.addColliders.send (@players[1])
-    
+
         @worldBlocks = BlockManager.mkBehaviors()
         @camera = new Camera tick, this
 
@@ -196,7 +203,7 @@ class World
 
     save: ->
     reload: ->
-  
+
 module.exports.World = World
 module.exports.MoveEvent = MoveEvent
 module.exports.StopMoveEvent = StopMoveEvent
