@@ -60,6 +60,7 @@ Preload.prototype = {
     this.load.image('trees_high', 'assets/w1_x.png');
       
     this.load.image('pixel', 'assets/pixel.png');
+    this.load.image('sunwalk', 'assets/sunwalk.png');
 
     // Create a game setup object
     this.game.gameSetup = new GameSetup();

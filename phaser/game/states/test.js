@@ -14,6 +14,8 @@ var ru = require ('../render/RenderUnit.js');
 var frpCfg = require ('../frp/frp_settings.js');
 var renderSettings = require ('../settings/RenderSettings.js');
 
+var background = require ('../frp/background.js');
+
 var tick = frp.tick
 
 function TestState() {}
@@ -105,20 +107,19 @@ TestState.prototype = {
 
         var that = this;
         frp.sync(function() {
-            that.r = new frpCfg.ConfigBehavior ("bg-red", 51);
-            that.g = new frpCfg.ConfigBehavior ("bg-green", 171);
-            that.b = new frpCfg.ConfigBehavior ("bg-blue", 249);
+            that.bg = new background.Background()
+//new frpCfg.ConfigBehavior ("bg-red", 51);
+            //that.g = new frpCfg.ConfigBehavior ("bg-green", 171);
+            //that.b = new frpCfg.ConfigBehavior ("bg-blue", 249);
         });
-
-        frpCfg.initialize(this.game.gameSettings, this.game.toolbar);
 
         frp.sync(function() {
             var anyChanged = frp.mergeAll ([
-               that.r.values(),
-               that.g.updates(),
-               that.b.updates(),
+               that.bg.r.values(),
+               that.bg.g.updates(),
+               that.bg.b.updates(),
                ])
-            var change = anyChanged.snapshotMany ([that.r, that.g, that.b], function (_, r, g, b) {
+            var change = anyChanged.snapshotMany ([that.bg.r, that.bg.g, that.bg.b], function (_, r, g, b) {
                   return function () {
                     that.game.stage.backgroundColor =
                         Math.floor(r / 16)*Math.pow(16, 5) + (r % 16)*Math.pow(16,4)
@@ -195,6 +196,7 @@ TestState.prototype = {
       else if (this.renderSettingsInitialized === 1) {
           this.renderSettingsInitialized = -1;
           renderSettings.initialize(this.game.gameSettings, this.game.toolbar);
+          frpCfg.initialize(this.game.gameSettings, this.game.toolbar);
       }
       this.game.debug.text(this.game.time.fps || '--', 2, 14, "#00ff00");
       this.game.debug.text(this.frpWorld.mod.value(), 2, 28, "#00ff00");

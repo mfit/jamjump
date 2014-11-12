@@ -29,7 +29,7 @@ class Player
         #             movement = new Movement tick, _this
         #             return movement.value
         # }, @tick, this
-        #@blockSetter = new BlockSetter @tick, @setBlockEvent
+        @blockSetter = new BlockSetter @tick, @setBlockEvent
 
         # position only to test discrepancies between phaser coordinates and behavior coordinates
         @setPosition = new frp.EventStream "SetPosition"
