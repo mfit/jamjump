@@ -20,7 +20,6 @@ class Player
         @landedOnBlock = new frp.EventStream "LandedOnBlock"
         @touchedWall = new frp.EventStream "TouchedWall"
 
-        @jumping = new Jumping @tick, this
         #startMovement = new Movement @tick, this
 
         @setMovementSystem = new frp.EventStream
@@ -128,6 +127,13 @@ class Movement
         wantsMoveEvent = @player.moveEvent.filter ((e) -> e instanceof MoveEvent)
         wantsStopMoveEvent = @player.moveEvent.filter ((e) -> e instanceof StopMoveEvent)
 
+        _wantsMove = frp.onEventMakeEvent wantsMoveEvent, (dir) =>
+            beh = frp.hold true, (wantsStopMoveEvent.once().constMap false)
+            return (frp.timer @tick, 50).constMap dir
+
+        wantsMoveEvent = _wantsMove
+    
+
         direction_Wanted = frp.hold Direction.null(), (wantsMoveEvent.map ((e) -> e))
         directionWanted = frp.hold Direction.null(), (wantsMoveEvent.map ((e) -> e.dir))
         @direction = directionWanted
@@ -154,6 +160,7 @@ class Movement
         ]
 
         canStartMove = startMove.gate (jumping.not())
+
         currentDir = frp.hold Direction.null(), (canStartMove.map (e) -> e.dir)
 
         @speed = new cfgFrp.ConfigBehavior "#{@player.name} speed", 300
@@ -166,7 +173,11 @@ class Movement
         moving = frp.apply running, jumping, (bMov, bJump) ->
             bMov and (not bJump)
         
+
+        @_jumping = new Jumping @tick, @player, onGround
+        @player.jumping = @_jumping
         playerJumping = @player.jumping
+
         velXmods = frp.mergeAll [
             canStartMove.snapshot @speed, (dir, speed) =>
                 (oldV) -> dir.dir.x * speed
@@ -275,7 +286,7 @@ class BlockSetter
         @blockSet = blockSet.ref
 
 class Jumping
-    constructor: (@tick, @player) ->
+    constructor: (@tick, @player, behOnGround) ->
         jumpResets = frp.mergeAll [
             @player.landedOnBlock
         ]
@@ -311,7 +322,7 @@ class Jumping
 
         wallJumpVel = dir.map ((x) => new Vector (x*-400), @JUMPFORCE)
         @value2 = jumpStarters.delay().gate canWallJump2
-        @value2 = @value2.gate (@jumpsSinceLand.map ((jumps) -> jumps >= 1))
+        @value2 = @value2.delay().gate (@jumpsSinceLand.map ((jumps) -> jumps >= 2))
         @value2 = @value2.gate canWallJump
         @value2 = @value2.snapshot wallJumpVel, frp.second
 

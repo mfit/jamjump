@@ -429,6 +429,10 @@ class WalkAnimation
         @falling = true
 
     land: () ->
+        if @running || @advance
+            @falling = false
+            @jumpingUp = false
+            return
         @player.sprite.animations.frame = 12
         @falling = false
         @jumpingUp = false
