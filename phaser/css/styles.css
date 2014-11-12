@@ -20,3 +20,10 @@ label {
   display: inline-block;
   width: 75px;
 }
+
+button {
+  border-radius:5px;
+  background:#777;
+  color:#eee;
+  border-color:#333;
+}
