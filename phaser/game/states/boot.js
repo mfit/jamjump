@@ -23,7 +23,7 @@ Boot.prototype = {
 
     // Toolbar
     var tb = new Toolbar(this.game);
-    this.game.toolBar = tb;
+    this.game.toolbar = tb;
     tb.draw();
   },
 };

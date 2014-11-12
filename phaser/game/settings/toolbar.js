@@ -3,28 +3,37 @@
 function Toolbar(game) {
   this.game = game;
   this.showstate; // keep track of show / hide
+  this.rootElement;
 
   // Initial showstate - start with options expanded or hidden ?
   this.showstate = true;
 }
 
 Toolbar.prototype = {
+
+  addInputAsHtml: function(element) {
+    this.rootElement.append(element);
+  },
+
   draw: function() {
     var that = this;
+
+    this.rootElement = $('<div class="toolbar">');
+
     // Draw a debug / settings toolbar using jquery
     $("document").ready(function() {
-      var tb, showhide, focus;
+      var showhide;
       showhide = $('<button class="showsettings">...</button>');
       $("body").append(showhide);
 
-      tb = $('<div class="toolbar">');
-      $("body").append(tb);
-      tb.append('<button data-func="setsize" data-x="1920" data-y="600">Large</button>');
-      tb.append('<button data-func="setsize" data-x="800" data-y="450">Med</button>');
-      tb.append('<button data-func="setsize" data-x="640" data-y="360">Small</button>');
+
+      $("body").append(that.rootElement);
+      that.rootElement.append('<button data-func="setsize" data-x="1920" data-y="600">Large</button>');
+      that.rootElement.append('<button data-func="setsize" data-x="800" data-y="450">Med</button>');
+      that.rootElement.append('<button data-func="setsize" data-x="640" data-y="360">Small</button>');
 
       // set clickhandler for view/game size buttons
-      tb.find("button[data-func='setsize']").click( function() {
+      that.rootElement.find("button[data-func='setsize']").click( function() {
         var x,y;
         x = parseInt($(this).data('x'));
         y = parseInt($(this).data('y'));
