@@ -7,6 +7,7 @@ postTick = frp.postTick
 
 shaders = require '../frp/shaders.js'
 render = require '../render/render.js'
+worldBeh = require '../frp/world_behaviors.js'
     
 # hack
 Phaser.TileSprite.prototype.kill = Phaser.Sprite.prototype.kill
@@ -107,6 +108,16 @@ setupBlockManager = (game, world) ->
 
     bm.block_group = game.add.group()#new render.BlockSpriteBatch @game
 
+    for player in world.players
+        setting = player.blockSetter.blockSet.snapshotMany [player.position], ((ignore, pos) =>
+            gridsize = 50;
+            x = Math.floor(pos.x / gridsize)
+            y = Math.floor(pos.y / gridsize + 1)
+            world.worldBlocks.addBlock.send {x:x, y:y, block: new worldBeh.DefaultBlock}
+            )
+        # side effects
+        setting.listen ((v) -> )
+
     world.worldBlocks.addedBlock.listen (blockInfo) ->
         x = blockInfo.x
         y = blockInfo.y
@@ -157,7 +168,6 @@ setupBlockManager = (game, world) ->
             block.sprite2.body.immovable = true
             block.sprite.block = block
             block.sprite2.block = block
-
 
 class ParticleGroup
     constructor: (game) ->
