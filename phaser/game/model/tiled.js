@@ -7,6 +7,11 @@ function TiledLoader(tiled_json_file, tileset_images, layers) {
     this.layer_names = layers;
     this.layers = {};
     this.loaded_images = {};
+
+    // Readonly, gets set when loading layers
+    this.width = 0;
+    this.height = 0;
+
     return this;
 }
 
@@ -21,22 +26,26 @@ TiledLoader.prototype.load = function(loader) {
 
 TiledLoader.prototype.create = function(adder) {
     var tiled_map = adder.tilemap('level');
-    
+
     for (var tileset in this.loaded_images) {
         tiled_map.addTilesetImage(tileset, tileset);
     }
-    
+
     for (var layer_id in this.layer_names) {
         var layer_name = this.layer_names[layer_id];
         //this.layers[layer_name] = tiled_map.createLayer(layer_name);
     }
-    
+
     this.tiled_map = tiled_map;
-    
+
     return tiled_map;
 }
 
 TiledLoader.prototype.runInterpreter = function (interpreter) {
+    // Reset size
+    this.width = 0;
+    this.height = 0;
+
     for (var layerId in this.tiled_map.layers) {
         var layer = this.tiled_map.layers[layerId];
         var layerInterpreter = interpreter.getLayerInterpreter(layer)
@@ -45,6 +54,10 @@ TiledLoader.prototype.runInterpreter = function (interpreter) {
                 layerInterpreter.makeTile(x, y, layer.data[y][x]);
             }
         }
+
+        // Store layer size to TiledLoader
+        this.width = layer.widthInPixels > this.width ? layer.widthInPixels : this.width;
+        this.height = layer.heightInPixels > this.height ? layer.heightInPixels : this.height;
     }
 }
 
@@ -59,7 +72,7 @@ function LayerInterpreter() {
 
 LayerInterpreter.prototype.makeTile = function (x, y, tile) {
 }
-    
+
 function BaseInterpreter(frpWorld) {
     this.frpWorld = frpWorld;
 }
