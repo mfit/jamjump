@@ -102,8 +102,7 @@ TestState.prototype = {
         // Init world from tiled-layer + reset world size
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
         console.log("World size" , this.game.tiled_loader.width, this.game.tiled_loader.height);
-        this.game.world.width = this.game.tiled_loader.width;
-        this.game.world.height = this.game.tiled_loader.height;
+        this.game.world.setBounds(0, 0, this.game.tiled_loader.width, this.game.tiled_loader.height);
 
 
         // All in group - draws in that order

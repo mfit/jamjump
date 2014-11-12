@@ -20,8 +20,8 @@ Toolbar.prototype = {
       tb = $('<div class="toolbar">');
       $("body").append(tb);
       tb.append('<button data-func="setsize" data-x="1920" data-y="600">Large</button>');
-      tb.append('<button data-func="setsize" data-x="800" data-y="600">Med</button>');
-      tb.append('<button data-func="setsize" data-x="640" data-y="400">Small</button>');
+      tb.append('<button data-func="setsize" data-x="800" data-y="450">Med</button>');
+      tb.append('<button data-func="setsize" data-x="640" data-y="360">Small</button>');
 
       // set clickhandler for view/game size buttons
       tb.find("button[data-func='setsize']").click( function() {
