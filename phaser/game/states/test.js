@@ -83,13 +83,22 @@ TestState.prototype = {
 
         // Capture Mouse Events ( mostly development / testing .. )
         this.game.input.mouse.mouseDownCallback = function(e) {
-          //console.log([e.x, e.y]);
-          //console.log(game.camera.position);
-          var wp = {x: e.x + game.camera.position.x - game.camera.view.width / 2,
-                      y: e.y + game.camera.position.y - game.camera.view.height / 2};
+
+          // Relative to html page:
+          // [e.x, e.y]
+
+          // Relative to game / canvas:
+          // [game.input.mousePointer.x, game.input.mousePointer.y]
+
+          var wp = {
+            x: game.input.mousePointer.x + game.camera.view.x,
+            y: game.input.mousePointer.y + game.camera.view.y
+          };
           var gridpos = that.frpWorld.worldBlocks.value().fromWorldCoords(wp.x, wp.y)
+          console.log([game.input.mousePointer.x, game.input.mousePointer.y]);
           console.log(wp);
           console.log(gridpos);
+
           frp.sync(function() {
             that.frpWorld.worldBlocks.addBlock.send({x:gridpos.x,
                                                   y:gridpos.y,
