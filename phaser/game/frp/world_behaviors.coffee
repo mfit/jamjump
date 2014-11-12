@@ -71,7 +71,8 @@ class BlockManager
 
     fromWorldCoords: (x, y) ->
         x = Math.floor(x / @blockSize)
-        y = Math.floor(y / @blockSize + 1)
+        # y = Math.floor(y / @blockSize + 1)
+        y = Math.floor(y / @blockSize)
         return {x:x, y:y}
 
     canAddBlock: (x, y) ->
