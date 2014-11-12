@@ -82,7 +82,6 @@ TestState.prototype = {
 
 
         // Capture Mouse Events ( mostly development / testing .. )
-        // this.frpWorld.enableWorldEnvironmentalStuff();
         this.game.input.mouse.mouseDownCallback = function(e) {
           //console.log([e.x, e.y]);
           //console.log(game.camera.position);
@@ -99,7 +98,13 @@ TestState.prototype = {
         };
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
+
+        // Init world from tiled-layer + reset world size
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
+        console.log("World size" , this.game.tiled_loader.width, this.game.tiled_loader.height);
+        this.game.world.width = this.game.tiled_loader.width;
+        this.game.world.height = this.game.tiled_loader.height;
+
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
@@ -331,11 +336,22 @@ TestState.prototype = {
         console.warn ("dt", end - start);
   },
   _connectMultiplayer : function() {
+    var that = this;
+
     console.log("Attempt connect to server..");
     var socket = io.connect('http://localhost:1337', {reconnection:false});
     socket.on('gup', function (data) {
+
       console.log("received an event : ");
       console.log(data);
+
+      if (data.x && data.y) {
+        // Test : attempt to set a block at the recieved location
+        frp.sync(function() {
+          that.frpWorld.worldBlocks.addBlock.send({x:data.x, y:data.y,
+            block: that.frpWorld.worldBlocks.value().blockFactory('default')})
+        });
+      }
     });
 
     // Handle disconnections manually
