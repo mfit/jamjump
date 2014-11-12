@@ -3,6 +3,8 @@ bower_components
 *.log
 *.tgz
 
+game/main.js
+
 #
 # Javascript files generated from cofeescript (and exceptions)
 #
