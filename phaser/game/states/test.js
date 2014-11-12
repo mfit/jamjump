@@ -62,9 +62,12 @@ TestState.prototype = {
             moveRightUp:this.input.keyUpEvent['D'],
             jumpDown:this.input.keyDownEvent['W'],
             jumpUp:this.input.keyUpEvent['W'],
+            abilityDown:this.input.keyDownEvent['Q'],
+            abilityUp:this.input.keyUpEvent['Q']
             }, {
             move: this.frpPlayer.moveEvent,
             jump: this.frpPlayer.jumpEvent,
+            ability: this.frpPlayer.abilityEvent,
             });
 
          this.keyboardInputP2 = new input.KeyboardInput({
@@ -74,9 +77,12 @@ TestState.prototype = {
             moveRightUp:this.input.keyUpEvent['L'],
             jumpDown:this.input.keyDownEvent['K'],
             jumpUp:this.input.keyUpEvent['K'],
+            abilityDown:this.input.keyDownEvent['U'],
+            abilityUp:this.input.keyUpEvent['U']
             }, {
             move: this.otherFrpPlayer.moveEvent,
             jump: this.otherFrpPlayer.jumpEvent,
+            ability: this.otherFrpPlayer.abilityEvent,
             });
 
         frp.sync(function() {that.keyboardInputP1.mkBehaviors();});
@@ -290,11 +296,6 @@ TestState.prototype = {
               });
       }
       if (this.game.input.keyboard.isDown(Phaser.Keyboard.J)) {
-          playerEvents.push ({
-              target:'otherFrpPlayer',
-              event:'setBlockEvent',
-              value:true
-          });
           playerEvents.push (function() {
               that.otherFrpPlayer.setBlockEvent.send(true);
               });

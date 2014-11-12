@@ -49,6 +49,8 @@ TiledLoader.prototype.runInterpreter = function (interpreter) {
     for (var layerId in this.tiled_map.layers) {
         var layer = this.tiled_map.layers[layerId];
         var layerInterpreter = interpreter.getLayerInterpreter(layer)
+        if (layerInterpreter === null)
+            continue;
         for (var y = 0; y < layer.data.length; y++) {
             for (var x = 0; x < layer.data[y].length; x++) {
                 layerInterpreter.makeTile(x, y, layer.data[y][x]);
@@ -82,6 +84,7 @@ BaseInterpreter.prototype.getLayerInterpreter = function (layer) {
     if (layer.name == "BlockLayer") {
         return new BlockLayerInterpreter(this);
     }
+    return null;
 }
 
 function BlockLayerInterpreter(baseInterpreter) {
@@ -115,6 +118,8 @@ BlockLayerInterpreter.prototype.makeTile = function (x, y, tile) {
 
 LoadTiledAtlas = function (game, tilemap) {
     for (var setIndex = 0; setIndex < tilemap.tilesets.length; setIndex++) {
+        if (setIndex >= 1)
+            continue;
         var set = tilemap.tilesets[setIndex];
         var frames = [];
         for (var gid = set.firstgid; gid < set.firstgid + set.total; gid++) {

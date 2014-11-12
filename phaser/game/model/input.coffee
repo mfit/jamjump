@@ -100,10 +100,20 @@ class KeyboardInput
 
         unlistenMove = @mkMovement()
         unlistenJump = @mkJumping()
+        unlistenAbility = @mkAbility()
 
         @unlisten = ->
             unlistenMove()
             unlistenJump()
+            unlistenAbility()
+
+    mkAbility: ->
+        abilityDown = @inputConfig.abilityDown
+        abilityUp = @inputConfig.abilityUp
+        [abDown, abUp] = KeyboardInput.mkSimple abilityDown, abilityUp
+        unlistenAbility = abilityDown.listen (_) =>
+            @commands.push (=>@worldConfig.ability.send true)
+        return unlistenAbility
 
     mkJumping: ->
         jumpDown = @inputConfig.jumpDown

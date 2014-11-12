@@ -13,6 +13,7 @@ class Player
     constructor: (@tick, @name="p", @spriteKey="runner1") ->
         @moveEvent = new frp.EventStream "MoveEvent"
         @jumpEvent = new frp.EventStream "JumpEvent"
+        @abilityEvent = new frp.EventStream
         @setBlockEvent = new frp.EventStream "SetBlockEvent"
 
         # from phaser
