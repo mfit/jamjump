@@ -49,8 +49,8 @@ TestState.prototype = {
         // Setup multiplayer
         this._connectMultiplayer();
 
-        this.game.world.width = 20000;
-        this.game.world.height = 5000;
+        this.game.world.width = 10000;
+        this.game.world.height = 2500;
 
         this.frpPlayer = this.frpWorld.players[0];
         this.otherFrpPlayer = this.frpWorld.players[1];
@@ -83,8 +83,38 @@ TestState.prototype = {
         frp.sync(function() {that.keyboardInputP2.mkBehaviors();});
 
 
+        // Capture Mouse Events ( mostly development / testing .. )
+        this.game.input.mouse.mouseDownCallback = function(e) {
+
+          // Relative to html page:
+          // [e.x, e.y]
+
+          // Relative to game / canvas:
+          // [game.input.mousePointer.x, game.input.mousePointer.y]
+
+          var wp = {
+            x: game.input.mousePointer.x + game.camera.view.x,
+            y: game.input.mousePointer.y + game.camera.view.y
+          };
+          var gridpos = that.frpWorld.worldBlocks.value().fromWorldCoords(wp.x, wp.y)
+          console.log([game.input.mousePointer.x, game.input.mousePointer.y]);
+          console.log(wp);
+          console.log(gridpos);
+
+          frp.sync(function() {
+            that.frpWorld.worldBlocks.addBlock.send({x:gridpos.x,
+                                                  y:gridpos.y,
+                                                  block: that.frpWorld.worldBlocks.value().blockFactory('default')})
+          });
+        };
+
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
+
+        // Init world from tiled-layer + reset world size
         frp.sync(function () {that.game.tiled_loader.runInterpreter(new Tiled.BaseInterpreter(that.frpWorld));});
+        console.log("World size" , this.game.tiled_loader.width, this.game.tiled_loader.height);
+        this.game.world.setBounds(0, 0, this.game.tiled_loader.width, this.game.tiled_loader.height);
+
 
         // All in group - draws in that order
         this.game.rootGroup = this.game.add.group();
@@ -127,7 +157,7 @@ TestState.prototype = {
                         +Math.floor(b / 16)*Math.pow(16, 1) + (b % 16)*Math.pow(16,0)
                         ;
                   }
-                });     
+                });
             change.listen (function (f) {f()});
             });
 
@@ -165,9 +195,9 @@ TestState.prototype = {
       this.running = true;
       this.spaceDown = false;
       this.renderSettingsInitialized = 0;
-      
+
       // HACK HACK
-      var old = Phaser.Stage.prototype.visibilityChange 
+      var old = Phaser.Stage.prototype.visibilityChange
       var that = this;
       this.hasFocus = true;
       Phaser.Stage.prototype.visibilityChange = function (event) {
@@ -316,11 +346,22 @@ TestState.prototype = {
         console.warn ("dt", end - start);
   },
   _connectMultiplayer : function() {
+    var that = this;
+
     console.log("Attempt connect to server..");
     var socket = io.connect('http://localhost:1337', {reconnection:false});
     socket.on('gup', function (data) {
+
       console.log("received an event : ");
       console.log(data);
+
+      if (data.x && data.y) {
+        // Test : attempt to set a block at the recieved location
+        frp.sync(function() {
+          that.frpWorld.worldBlocks.addBlock.send({x:data.x, y:data.y,
+            block: that.frpWorld.worldBlocks.value().blockFactory('default')})
+        });
+      }
     });
 
     // Handle disconnections manually

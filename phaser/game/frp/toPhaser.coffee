@@ -1,5 +1,6 @@
 render = require '../render/render.js'
 frp = require '../frp/frp.js'
+cfgFrp = require '../frp/frp_settings.js'
 log = frp.log
 tick = frp.tick
 preTick = frp.preTick
@@ -8,7 +9,7 @@ postTick = frp.postTick
 shaders = require '../frp/shaders.js'
 render = require '../render/render.js'
 worldBeh = require '../frp/world_behaviors.js'
-    
+
 # hack
 Phaser.TileSprite.prototype.kill = Phaser.Sprite.prototype.kill
 
@@ -28,11 +29,19 @@ setup = (@game, world) ->
                     if sprite.body.touching.down == true
                         player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
 
-                    if sprite.body.touching.left == true 
+                    if sprite.body.touching.left == true
                         player.touchedWall.send (-1)
                     if sprite.body.touching.right == true
                         player.touchedWall.send 1
-                ) )
+
+                # test for winning collision
+                game.physics.arcade.collide world.goaltree, player.sprite, (pl, gtree) =>
+
+                    # change tree's texture:
+                    console.log "win!"
+                    console.log pl
+                    gtree.loadTexture 'treelarge2'
+            ) )
         # side effects
         #(s player).listen ((v) ->)
 
@@ -69,8 +78,17 @@ setupCamera = (@game, world, camera) ->
         @game.camera.x = @camPos.x + @offset
 
 setupTrees = (game, world) ->
+    # background
+    world.bgimage = game.add.sprite 0, 500, 'trees'
+    world.bgimage.scale.x = 20
+    world.bgimage.scale.y = 20
+    world.bgimage.x = 0
+    world.bgimage.y = 0
+    world.bgimage.alpha = 0.5
+
     world.trees = game.add.group();
     world.tree = game.add.sprite 0, 500, 'trees'
+
     world.tree.shader = new shaders.ColorFilter {x:1, y:1, z:1}
     #world.tree.blendMode = PIXI.blendModes.ADD
     world.trees_high = game.add.sprite 0, 500, 'trees_high'
@@ -78,8 +96,24 @@ setupTrees = (game, world) ->
 
     world.trees_high.shader = new shaders.IntensityFilter 0, {x:1, y:1, z:0.8}
 
+    world.goaltree = game.add.sprite 9000, 2250, 'treelarge1'
+    world.goaltree.enableBody = true
+    game.physics.enable(world.goaltree, Phaser.Physics.ARCADE, true);
+    world.goaltree.scale.x = 2
+    world.goaltree.scale.y = 2
+
+
     world.trees.add world.tree
     world.trees.add world.trees_high
+    world.trees.add world.goaltree
+
+    x = new cfgFrp.ConfigBehavior "tree_x", 8870
+    y = new cfgFrp.ConfigBehavior "tree_y", 2050
+
+    x.updates().listen (x) ->
+        world.goaltree.x = x
+    y.updates().listen (y) ->
+        world.goaltree.y = y
 
     world.tick.listen ((t) =>
             width = world.trees_high.texture.width
@@ -99,7 +133,7 @@ setupTrees = (game, world) ->
 setupBlockManager = (game, world) ->
     # a hack. but we use references so this works :/
     bm = world.worldBlocks.value()
-    
+
     bm.coll_group = game.add.group()
     bm.coll_group.enableBody = true;
     bm.coll_group.allowGravity = false;
@@ -130,7 +164,7 @@ setupBlockManager = (game, world) ->
            right: if bm.blocks[y].hasOwnProperty (x+1) then bm.blocks[y][x+1] else null
            top: if (bm.blocks.hasOwnProperty (y-1)) and bm.blocks[y-1].hasOwnProperty (x) then bm.blocks[y-1][x] else null
            bottom: if (bm.blocks.hasOwnProperty (y+1)) and bm.blocks[y+1].hasOwnProperty x then bm.blocks[y+1][x] else null
-       
+
         setIndex = game.map.tiles[block.gid][2];
         set = game.map.tilesets[setIndex];
 
@@ -201,7 +235,7 @@ class ParticleGroup
             @group2.addChild innerGlow
         @inners = inners
         @outers = outers
- 
+
         tick.listen ((dt_) ->
             dt = dt_/1000.0
             for _, i in inners
@@ -256,14 +290,14 @@ setupPlayer = (player, game, world) ->
 
         game.time.physicsElapsed = t/1000.0
         player.sprite.body.preUpdate()
-        
+
         game.physics.arcade.collide blockManager.coll_group, player.sprite, (sprite, group_sprite) =>
             if group_sprite.body.touching.up == true
                 group_sprite.block.touchEvent.send true
             if sprite.body.touching.down == true
                 player.landedOnBlock.send (sprite.body.velocity.y - sprite.body.newVelocity.y)
 
-            if sprite.body.touching.left == true 
+            if sprite.body.touching.left == true
                 player.touchedWall.send (-1)
             if sprite.body.touching.right == true
                 player.touchedWall.send 1
@@ -342,11 +376,14 @@ class WalkAnimation
 
     tick: (dt) ->
         # FIXME remove me when animations for 2nd player exist
+        run_startfrm = 0
+        run_frmslen = 12
+
         if @leftover + dt > @msPerFrame
             if (@advance == false) and (@player.sprite.animations.currentFrame.index == 4)
                 @player.sprite.animations.frame = 12
                 @running = false
-                console.log this
+                # console.log this
                 @leftover = 0
                 return
 
@@ -357,23 +394,20 @@ class WalkAnimation
                 return
 
             if @running
-                if @player.sprite.animations.currentFrame.index == 11
-                    @player.sprite.animations.frame = 0
-                else
-                    @player.sprite.animations.frame = @player.sprite.animations.currentFrame.index + 1
+                @player.sprite.animations.frame = run_startfrm + ((@player.sprite.animations.currentFrame.index - run_startfrm + 1) % run_frmslen)
 
             if @jumpingUp == true
-                console.log "jumping", @player.sprite.animations.currentFrame.index
+                # console.log "jumping", @player.sprite.animations.currentFrame.index
                 if @player.sprite.animations.currentFrame.index == 13
                     @player.sprite.animations.frame = 14
                 else
                     @player.sprite.animations.frame = 13
             else if @falling == true
-                console.log "falling", @player.sprite.animations.currentFrame.index
+                # console.log "falling", @player.sprite.animations.currentFrame.index
                 if @player.sprite.animations.currentFrame.index == 15
                     @player.sprite.animations.frame = 16
                 else
-                    @player.sprite.animations.frame = 15               
+                    @player.sprite.animations.frame = 15
             @leftover = @leftover - @msPerFrame
 
         @leftover += dt
@@ -436,6 +470,6 @@ class WalkAnimation
             ]
         return anim.ref
 
- 
+
 module.exports =
     setup:setup

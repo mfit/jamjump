@@ -18,16 +18,16 @@ configs = new Configs()
 
 initialize = (settings, toolbar) ->
     settings.behaviors = {}
-    options = $("body").append('<div class="options">')
     for behaviorName, beh of configs.behaviors
         settings.behaviors[behaviorName] = beh
 
     frp.sync -> settings.loadLocal()
 
     for behaviorName, beh of configs.behaviors
-        opt = options.append "<div class=#{behaviorName}>"
+        opt = $("<div class=#{behaviorName}>")
         opt.append "<label>#{behaviorName}</label>"
-        inp = opt.append "<input type=#{beh.settings.type} name='#{behaviorName}' value=#{beh.value()}>"
+        inp = $("<input type=#{beh.settings.type} name='#{behaviorName}' value=#{beh.value()}>")
+        inp = opt.append inp
 
         cb = (beh, inp) -> ->
             if beh.settings.type == 'number'
@@ -35,6 +35,8 @@ initialize = (settings, toolbar) ->
                 frp.sync -> beh.update parseFloat inp.value
                 settings.saveLocal()
         inp.on 'input', (cb beh, (opt.find "input[name='#{behaviorName}']")[0])
+
+        toolbar.addInputAsHtml opt
 
 
 module.exports =

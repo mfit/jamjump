@@ -3,3 +3,18 @@ bower_components
 *.log
 *.tgz
 
+game/main.js
+
+#
+# Javascript files generated from cofeescript (and exceptions)
+#
+game/render/*.js
+game/frp/*.js
+game/model/input.js
+game/settings/*.js
+game/spec/*.js
+!game/frp/SkipList.js
+!game/settings/gamesettings.js
+!game/settings/toolbar.js
+
+
