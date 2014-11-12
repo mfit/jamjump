@@ -95,16 +95,25 @@ TestState.prototype = {
             y: game.input.mousePointer.y + game.camera.view.y
           };
           var gridpos = that.frpWorld.worldBlocks.value().fromWorldCoords(wp.x, wp.y)
+
           console.log([game.input.mousePointer.x, game.input.mousePointer.y]);
           console.log(wp);
           console.log(gridpos);
-
-          frp.sync(function() {
-            that.frpWorld.worldBlocks.addBlock.send({x:gridpos.x,
-                                                  y:gridpos.y,
-                                                  block: that.frpWorld.worldBlocks.value().blockFactory('default')})
-          });
+          console.log(game.input.mouse.button);
+          if (game.input.mouse.button == 0) {
+            frp.sync(function() {
+              that.frpWorld.worldBlocks.addBlock.send({x:gridpos.x,
+                                                    y:gridpos.y,
+                                                    block: that.frpWorld.worldBlocks.value().blockFactory('default')})
+            });
+          } else if (game.input.mouse.button==2) {
+            // that.game.camera.x = wp.x;
+            // that.game.camera.y = wp.y;
+          }
         };
+        // deactivate context menu
+        this.game.canvas.oncontextmenu = function() { return false; };
+
 
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 

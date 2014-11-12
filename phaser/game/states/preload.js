@@ -82,7 +82,7 @@ Preload.prototype = {
     //
     //this.load.image('tileset', 'assets/tileset.png'); // loading the tileset image
     //var level_file = 'tiled_level.json';
-    var level_file = 'demolevel.json';
+    var level_file = 'tinylevel.json';
     this.load.tilemap('map', 'assets/test.json', null, Phaser.Tilemap.TILED_JSON); // loading the tilemap
     this.game.tiled_loader = new Tiled.TiledLoader('assets/levels/' + level_file, {'tileset':'assets/tileset.png'},
                                          ['BlockLayer']);
