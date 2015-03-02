@@ -2,6 +2,29 @@ function hash(x, y) {
     return (x + ',' + y);
 }
 
+function RemoveBlockStrategy(world) {
+    this.world = world;
+
+    function removeRandom(world) {
+
+        // Get all removables
+        // TODO : keep that list prepared / indexed in WorldBlocks
+        var non_perm_blocks = [];
+        for (bk in world.blocks) {
+            if( ! world.blocktypes[world.blocks[bk].k.t].perma ) {
+                non_perm_blocks.push(world.blocks[bk]);
+            }
+        }
+
+        var index = Math.round(Math.random() * non_perm_blocks.length);
+        world.pendingRemoves.push({key:non_perm_blocks[index]});
+    }
+
+    this.remove = function() {
+        removeRandom(this.world);
+    }
+}
+
 function WorldBlocks (game) {
     this.game = game;
     this.blocks = {};
@@ -11,6 +34,8 @@ function WorldBlocks (game) {
     this.block_group.enableBody = true;
     this.block_group.allowGravity = false;
     this.block_group.immovable = true;
+
+    this.blockremove = new RemoveBlockStrategy(this);
 
     this.blocktypes = {
         'default': {
@@ -61,6 +86,9 @@ WorldBlocks.prototype = {
         x = Math.floor(x / gridsize);
         y = Math.floor(y / gridsize + 1);
         return {x:x, y:y};
+    },
+    removeBlock: function(currentSprite, otherSprite) {
+        this.blockremove.remove();
     },
     removeClosestTo: function (x, y) {
         var blockCoords2 = this.fromWorldCoords(x, y);

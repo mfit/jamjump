@@ -14,7 +14,7 @@ Preload.prototype = {
 
     this.load.onLoadComplete.addOnce(this.onLoadComplete, this);
     this.load.setPreloadSprite(this.asset);
-    this.load.audio('bla', 'assets/sound/pingsong.ogg');
+    this.load.audio('bla', 'assets/sound/main.ogg');
     this.load.audio('jumpsound','assets/sound/plop.ogg');
     this.load.audio('blocksound', 'assets/sound/plopplop2.ogg');
 
@@ -31,6 +31,7 @@ Preload.prototype = {
     this.load.text('level2', 'assets/levels/level2.txt');
     this.load.text('level3', 'assets/levels/level3.txt');
     this.load.text('level4', 'assets/levels/level4.txt');
+    this.load.text('level5', 'assets/levels/level4.txt');
     this.game.level = 0;
 
     this.game.levelData = [];
@@ -39,6 +40,7 @@ Preload.prototype = {
     this.game.levelData[2] = this.load.getAsset('text', 'level2');
     this.game.levelData[3] = this.load.getAsset('text', 'level3');
     this.game.levelData[4] = this.load.getAsset('text', 'level4');
+    this.game.levelData[5] = this.load.getAsset('text', 'level5');
 
     this.load.spritesheet('runner', 'assets/runner_sheet2.png', 26, 24, -1, 0, 0);
     this.load.image('titlecharacter', 'assets/komischgucker_alpha.png');

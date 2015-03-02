@@ -44,7 +44,7 @@ JumpPlayer.prototype = {
     // or if it is still blocked (timing constraints)
     // (in case it is possible, it will automatically reset the timer)
     var t = this.game.time.now;
-	
+
     if ( this.actionTimers[actionName] === undefined ||
         t - this.actionTimers[actionName] > this.NOREPEAT) {
         this.actionTimers[actionName] = t;
@@ -83,7 +83,7 @@ JumpPlayer.prototype = {
     this.sprite.body.gravity.y = 1050;
     console.log(this.sprite.body);
     this.sprite.allowGravity = true;
-    this.fullSpeedTreshold = 300;
+    this.fullSpeedTreshold = false; // to turn on , set value e.g. 300;
     this.fullSpeedCounter = 0;
     this.didDoubleJump = false;
 
@@ -124,7 +124,8 @@ JumpPlayer.prototype = {
         this.fullSpeedCounter = 0;
     }
 
-    if (this.fullSpeedCounter > this.fullSpeedTreshold) {
+    // When enabled, double speed (running) after some time
+    if (this.fullSpeedTreshold && this.fullSpeedCounter > this.fullSpeedTreshold) {
         this.sprite.body.velocity.x *= 2.0;
     }
 

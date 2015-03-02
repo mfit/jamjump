@@ -4,6 +4,16 @@
   var WorldBlocks = require('../model/world');
   function Play() {}
   Play.prototype = {
+    doFullscreen: function() {
+      // Full screen helper
+      if (this.game.scale.isFullScreen) {
+        this.game.scale.stopFullScreen();
+      } else {
+        this.game.scale.startFullScreen(false);
+      }
+    },
+
+
     create: function() {
       var i, sp, ctrl,
         that = this,
@@ -19,6 +29,12 @@
       if (this.game.gameSetup.backgroundMusic) {
         this.game.gameSetup.backgroundMusic.play('',0,1,true);
       }
+
+      // Set fullscreen mode (modes are EXACT_FIT, SHOW_ALL, NO_SCALE
+      this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
+
+      // fullscreen on click
+      this.game.input.onDown.add(this.doFullscreen, this);
 
 
       // this.game.load.tilemap('platformer', 'assets/platformer.json', null, Phaser.Tilemap.TILED_JSON);
@@ -106,12 +122,19 @@
       this.wb = new WorldBlocks(this.game);
 
 
+      //
+      // Always play level 5
+      //
+      this.game.level = 5;
+
+
       // LEVEL / BLOCKS --------------------------------------
       // TODO : move this to levelLoader component
       //
       // Load the level from the textfile
       //
       var theLevel = this.game.levelData[this.game.level].file.data;
+
       //console.log(this.game.level);
       //console.log(theLevel);
 
@@ -237,9 +260,10 @@
       y = Math.floor(sprite.body.y / gridsize + 1);
 
       if(this.wb.canAddBlock(x,y)) {
-	    this.blocksound.play();
+	     this.blocksound.play();
         this.wb.addBlock(x, y);
-        this.wb.removeClosestTo(otherSprite.body.x, otherSprite.body.y);
+        // this.wb.removeClosestTo(otherSprite.body.x, otherSprite.body.y);
+        this.wb.removeBlock(sprite, otherSprite);
         sprite.lastBlockSet = this.game.time.now;
       }
 
