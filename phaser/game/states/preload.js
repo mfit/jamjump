@@ -14,7 +14,8 @@ Preload.prototype = {
 
     this.load.onLoadComplete.addOnce(this.onLoadComplete, this);
     this.load.setPreloadSprite(this.asset);
-    this.load.audio('bla', 'assets/sound/main.ogg');
+    this.load.audio('track1', 'assets/sound/pingsong.ogg');
+    this.load.audio('track2', 'assets/sound/main.ogg');
     this.load.audio('jumpsound','assets/sound/plop.ogg');
     this.load.audio('blocksound', 'assets/sound/plopplop2.ogg');
 
@@ -42,7 +43,7 @@ Preload.prototype = {
     this.game.levelData[4] = this.load.getAsset('text', 'level4');
     this.game.levelData[5] = this.load.getAsset('text', 'level5');
 
-    this.load.spritesheet('runner', 'assets/runner_sheet2.png', 26, 24, -1, 0, 0);
+    this.load.spritesheet('runner', 'assets/runner_all.png', 26, 24, -1, 0, 0);
     this.load.image('titlecharacter', 'assets/komischgucker_alpha.png');
 
     this.load.image('redboxblock', 'assets/Block1.png');
@@ -57,7 +58,7 @@ Preload.prototype = {
     // Create a game setup object
     this.game.gameSetup = new GameSetup();
 
-    this.game.gameSetup.backgroundMusic = this.game.add.audio('bla');
+    this.game.gameSetup.backgroundMusic = this.game.add.audio('track1');
 
     var font = this.game.load.bitmapFont('nokia',
             'assets/fonts/nokia.png',

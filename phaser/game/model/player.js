@@ -55,15 +55,10 @@ JumpPlayer.prototype = {
   },
 
   chooseSkin: function (skin_n) {
-
     if (skin_n < 2) {
-        //this.sprite.loadTexture('runner', 1);
-        // this.sprite.loadTexture('allblocks', 22);
-
+        this.sprite.animations.play('jump', 15, true);
     } else {
-        this.sprite.loadTexture('runner', 1);
-        // this.sprite.loadTexture('allblocks', 42);
-
+        this.sprite.animations.play('run', 15, true);
     }
 
   },
@@ -88,7 +83,9 @@ JumpPlayer.prototype = {
     this.didDoubleJump = false;
 
     // Default skin-1
-    this.chooseSkin(1);
+    this.chooseSkin(this.playerId);
+
+    this.sprite.anchor.set(0.5, 0);
   },
 
   registerBlockTouch: function(block) {
@@ -123,6 +120,14 @@ JumpPlayer.prototype = {
     } else if (this.jumpStarted == false) {
         this.fullSpeedCounter = 0;
     }
+
+    // Mirror sprite (look left or right)
+    if (this.controller.getDirection().x > 0) {
+        this.sprite.scale.setTo(1 , 1);
+    } else if (this.controller.getDirection().x < 0) {
+        this.sprite.scale.setTo(-1 , 1);
+    }
+
 
     // When enabled, double speed (running) after some time
     if (this.fullSpeedTreshold && this.fullSpeedCounter > this.fullSpeedTreshold) {

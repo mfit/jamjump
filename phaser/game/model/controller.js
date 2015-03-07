@@ -56,8 +56,14 @@ JumpKeyboardController.prototype = {
 };
 
 
-function JumpGamepadController(controllerHandler) {
+function JumpGamepadController(controllerHandler, settings) {
     this.handler = controllerHandler;
+    this.settings = settings;
+    this.type = settings.type || 1;
+
+    this.type = true;
+    this.abutton = this.type ? Phaser.Gamepad.XBOX360_X : Phaser.Gamepad.XBOX360_Y;
+    this.bbutton = this.type ? Phaser.Gamepad.XBOX360_A : Phaser.Gamepad.XBOX360_B;
 }
 
 JumpGamepadController.prototype = {
@@ -69,15 +75,15 @@ JumpGamepadController.prototype = {
   },
 
   getButtonA: function() {
-    return this.handler.isDown(Phaser.Gamepad.XBOX360_X);
+    return this.handler.isDown(this.abutton);
   },
 
   getButtonB: function() {
-    return this.handler.isDown(Phaser.Gamepad.XBOX360_A);
+    return this.handler.isDown(this.bbutton);
   },
 
   getButtonBUp: function() {
-    return this.handler.isUp(Phaser.Gamepad.XBOX360_A);
+    return this.handler.isUp(this.bbutton);
   },
 
 };

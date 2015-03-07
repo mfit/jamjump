@@ -27,7 +27,15 @@
 
        // Start background music. If is kept somewhere, will not play multiple times
       if (this.game.gameSetup.backgroundMusic) {
-        this.game.gameSetup.backgroundMusic.play('',0,1,true);
+
+        // set background music song:
+        //this.game.gameSetup.backgroundMusic = this.game.add.audio('track1');
+
+        if (this.game.gameSetup.playMusic) {
+          this.game.gameSetup.backgroundMusic.play('',0,1,true);
+        } else {
+          this.game.gameSetup.backgroundMusic.stop('',0,1,true);
+        }
       }
 
       // Set fullscreen mode (modes are EXACT_FIT, SHOW_ALL, NO_SCALE
@@ -80,7 +88,7 @@
               {left:Phaser.Keyboard.LEFT, right: Phaser.Keyboard.RIGHT, jump: Phaser.Keyboard.SPACE, block: Phaser.Keyboard.UP}
               ),
 
-          'gamepad': new JumpController('gamepad', gamepad.pad1, {}),
+          'gamepad': new JumpController('gamepad', gamepad.pad1, {type:0}),
           'gamepad2': new JumpController('gamepad', gamepad.pad2, {}),
       };
 
@@ -98,8 +106,8 @@
           Math.random() * (that.game.height / 2),
           'runner');
 
-        temp_sprite.animations.add('run');
-        temp_sprite.animations.play('run', 15, true);
+        temp_sprite.animations.add('run', [0,1,2,3,4,5,6,7,8]);
+        temp_sprite.animations.add('jump', [9,10,11]);
 
         temp_player = new JumpPlayer(
           that,
