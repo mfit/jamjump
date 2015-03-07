@@ -9,7 +9,7 @@ function JumpSetup() {
     { name:"player2",
       skin:2,
       id:2,
-      controller:'keyb'
+      controller:'keyb2'
     },
     /*{ name:"player3",
       skin:2,

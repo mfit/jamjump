@@ -58,10 +58,21 @@ GUI.prototype = {
                     32);
                 that.texts.push(txt);
             }
-            this.game.players.forEach(function(p) {
+
+            // this.game.players.forEach(function(p) {
+            // });
+
+            // score :
+            var scoretxt = that.game.add.bitmapText(
+                    400,
+                    0,
+                    'nokia',
+                    "Score: " + this.game.score[0] + ":" + this.game.score[1],
+                    32);
+            that.texts.push(scoretxt);
 
 
-            });
+
         }
     }
 };

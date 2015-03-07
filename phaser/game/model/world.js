@@ -4,6 +4,10 @@ function hash(x, y) {
 
 function RemoveBlockStrategy(world) {
     this.world = world;
+    this.strategies = {};
+    this.strategy = 'closest';
+    // this.strategy = 'random';
+    this.strategy = 'round';
 
     function removeRandom(world) {
 
@@ -20,8 +24,22 @@ function RemoveBlockStrategy(world) {
         world.pendingRemoves.push({key:non_perm_blocks[index]});
     }
 
-    this.remove = function() {
-        removeRandom(this.world);
+    function removeClosest(world, currentSprite, otherSprite) {
+        world.removeClosestTo(otherSprite.x, otherSprite.y);
+    }
+
+    function removeRoundRobin(world, currentSprite, otherSprite) {
+        if ( world.block_history && world.block_history.length ) {
+            world.pendingRemoves.push({key:world.blocks[world.block_history[0]]});
+        }
+    }
+
+    this.strategies['random'] = removeRandom;
+    this.strategies['closest'] = removeClosest;
+    this.strategies['round'] = removeRoundRobin;
+
+    this.remove = function(currentSprite, otherSprite) {
+        this.strategies[this.strategy](this.world, currentSprite, otherSprite);
     }
 }
 
@@ -34,6 +52,8 @@ function WorldBlocks (game) {
     this.block_group.enableBody = true;
     this.block_group.allowGravity = false;
     this.block_group.immovable = true;
+    this.gridsize=19;
+    this.block_history = [];
 
     this.blockremove = new RemoveBlockStrategy(this);
 
@@ -58,12 +78,18 @@ function WorldBlocks (game) {
             texture:['winblock', 1],
             kills:false,
             win:true,
+            player:1,
+        },
+        'win2': {
+            perma:true,
+            texture:['winblock2', 1],
+            kills:false,
+            win:true,
+            player:2,
         },
 
     };
 }
-
-var gridsize=19;
 
 WorldBlocks.prototype = {
     canAddBlock: function(x,y) {
@@ -75,20 +101,21 @@ WorldBlocks.prototype = {
         return 1;
 
 	},
+    hash: hash,
     addBlock: function(x, y, t) {
         var t = t || 'default';
         this.pendingAdds.push({x:x, y:y, t:t});
     },
     toWorldCoords: function(x, y) {
-        return {x:x*19, y:y*19};
+        return {x:x*this.gridsize, y:y*this.gridsize};
     },
     fromWorldCoords: function (x, y) {
-        x = Math.floor(x / gridsize);
-        y = Math.floor(y / gridsize + 1);
+        x = Math.floor(x / this.gridsize);
+        y = Math.floor(y / this.gridsize + 1);
         return {x:x, y:y};
     },
     removeBlock: function(currentSprite, otherSprite) {
-        this.blockremove.remove();
+        this.blockremove.remove(currentSprite, otherSprite);
     },
     removeClosestTo: function (x, y) {
         var blockCoords2 = this.fromWorldCoords(x, y);
@@ -279,6 +306,10 @@ WorldBlocks.prototype = {
             });
         return;
     },
+    registerBlockTouch: function(block) {
+        block.model;
+        // this.pendingRemoves.push({key:hash(block.model.x, block.model.y));
+    },
     update: function() {
         var that = this;
         this.pendingAdds.forEach(function (v, i) {
@@ -291,6 +322,11 @@ WorldBlocks.prototype = {
             sp.model = v;
             that.blocks[hash(v.x, v.y)] = {k:v, v:sp};
 
+            if ( ! that.blocktypes[sp.model.t].perma ) {
+                // if non perma, add to history
+                that.block_history.push(hash(v.x, v.y));
+            }
+
             });
         this.pendingAdds = [];
 
@@ -298,6 +334,13 @@ WorldBlocks.prototype = {
             if (v.key) {
                 v.key.v.kill();
                 delete that.blocks[hash(v.key.k.x, v.key.k.y)]
+
+                var i = that.block_history.indexOf(hash(v.key.k.x, v.key.k.y));
+                if (i > -1) {
+                    that.block_history =
+                        that.block_history.slice(0, i)
+                            .concat(that.block_history.slice(i+1, that.block_history.length));
+                }
             }
         });
         this.pendingRemoves = [];

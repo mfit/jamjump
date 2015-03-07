@@ -2,6 +2,8 @@
   var JumpPlayer = require('../model/player');
   var JumpController = require('../model/controller');
   var WorldBlocks = require('../model/world');
+  var LevelBuilder = require('../model/levelbuilder.js');
+
   function Play() {}
   Play.prototype = {
     doFullscreen: function() {
@@ -25,6 +27,10 @@
       var music;
 	     this.blocksound = this.game.add.audio('blocksound');
 
+       // this.winmode = 'COOP';
+       this.winmode = 'COMP';
+       this.game.statePayerWin = -1;
+
        // Start background music. If is kept somewhere, will not play multiple times
       if (this.game.gameSetup.backgroundMusic) {
 
@@ -42,7 +48,33 @@
       this.game.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
 
       // fullscreen on click
-      this.game.input.onDown.add(this.doFullscreen, this);
+      // this.game.input.onDown.add(this.doFullscreen, this);
+
+      // fullscreen on key
+      var key0 = this.game.input.keyboard.addKey(Phaser.Keyboard.ZERO);
+      key0.onDown.add(this.doFullscreen, this);
+
+      // next level on key
+      var key9 = this.game.input.keyboard.addKey(Phaser.Keyboard.NINE);
+      key9.onDown.add(function() {
+        this.skipToLevel();
+      } , this);
+
+      // switch settertype
+      var key8 = this.game.input.keyboard.addKey(Phaser.Keyboard.EIGHT);
+      key8.onDown.add(function() {
+        this.settertype = this.settertype + 1 % Object.keys(this.wb.blocktypes).length;
+
+        // save level
+        this.lbuilder.saveLevel();
+
+      } , this);
+
+      // Mclick
+      this.game.input.onDown.add(this.mouseAction, this);
+
+      // Blocktype index we're setting on mouseclick
+      this.settertype = 0;
 
 
       // this.game.load.tilemap('platformer', 'assets/platformer.json', null, Phaser.Tilemap.TILED_JSON);
@@ -70,9 +102,6 @@
           onConnect: function onConnect(i) {
               console.log("connect");
           },
-          //onDown: function onDown(b, i, s) {
-          //    console.log("down");
-          //}
         });
 
       // Map to init controllers
@@ -133,7 +162,7 @@
       //
       // Always play level 5
       //
-      this.game.level = 5;
+      this.game.level = 6;
 
 
       // LEVEL / BLOCKS --------------------------------------
@@ -143,39 +172,8 @@
       //
       var theLevel = this.game.levelData[this.game.level].file.data;
 
-      //console.log(this.game.level);
-      //console.log(theLevel);
-
-      var x = -1, y = 0;
-      for (var ch in theLevel) {
-        if (theLevel[ch] == "\n") {
-          y++;
-          x = -1;
-        }
-
-        if (theLevel[ch] === "1") {
-          this.wb.addBlock(x, y);
-        } else if (theLevel[ch] === "2") {
-          this.wb.addBlock(x, y, 'stone');
-        } else if (theLevel[ch] === "3") {
-          this.wb.addBlock(x, y, 'death');
-        } else if (theLevel[ch] === "x") {
-          this.game.players[0].sprite.x = x*19;
-          this.game.players[0].sprite.y = y*19;
-        } else if (theLevel[ch] === "y") {
-          this.game.players[1].sprite.x = x*19;
-          this.game.players[1].sprite.y = y*19;
-        } else if (theLevel[ch] === "9") {
-          this.wb.addBlock(x, y, 'win');
-        }
-
-        x++;
-      }
-
-      // New jump mechanics nees a floor of blocks :
-      //for (i=0; i<50; i++) {
-      //  this.wb.addBlock(i, 30, 'stone');
-      //}
+      this.lbuilder = new LevelBuilder(this.game, this.wb, window.localStorage);
+      this.lbuilder.loadDefaultLevel(theLevel);
 
       // ------------------------------------------------------
 
@@ -193,6 +191,27 @@
       this.game.stage.backgroundColor = 0x333333;
 
 
+    },
+    mouseAction: function(ev) {
+      var coords = this.wb.fromWorldCoords(ev.x, ev.y);
+
+      console.log("Mouseclick at " + coords);
+      console.log(this.wb.hash(coords.x, coords[1]));
+
+      if(this.wb.blocks[this.wb.hash(coords.x, coords[1])]) {
+        this.wb.pendingRemoves.push({key:this.wb.blocks[this.wb.hash(coords.x, coords[1])]});
+      } else {
+        this.wb.addBlock(coords.x, coords.y - 1, Object.keys(this.wb.blocktypes)[this.settertype]);
+      }
+    },
+    skipToLevel: function(n) {
+      if (typeof n === "undefined") {
+        this.game.level = (this.game.level +1 ) % this.game.levelData.length;
+        this.game.state.start('play');
+      } else {
+        this.game.level = n;
+        this.game.state.start('play');
+      }
     },
     update: function() {
       var that = this;
@@ -217,28 +236,49 @@
           function (sprite, group) {
 
             if (that.wb.blocktypes[group.model.t].kills) {
+              // killed ..
+              if ( false ) {
+                // with killscreen
+                sprite.kill();
+                that.game.stateWinSuccess = false;
+                that.game.state.start('status');
+              } else {
+                // just re-spawn
+                var pos = p.getSpawnPosition();
+                sprite.x = pos[0];
+                sprite.y = pos[1];
 
-              sprite.kill();
-
-              //that.game.level = (that.game.level +1 ) % that.game.levelData.length;
-              that.game.stateWinSuccess = false;
-              that.game.state.start('status');
-
-
+                // and subtract score
+                that.game.score[p.playerId-1] -= 1;
+              }
             }
+
             if (that.wb.blocktypes[group.model.t].win) {
 
-              that.game.winMap[p.playerId] = true;
+              if (that.winmode == 'COOP') {
 
-              if (that.game.winMap['1'] && that.game.winMap['2']) {
-                that.game.level = (that.game.level +1 ) % that.game.levelData.length;
-                that.game.stateWinSuccess = true;
-                that.game.state.start('status');
+                that.game.winMap[p.playerId] = true;
+
+                // Co-op win : both players have touched the win stone
+                if (that.game.winMap['1'] && that.game.winMap['2']) {
+                  that.game.level = (that.game.level +1 ) % that.game.levelData.length;
+                  that.game.stateWinSuccess = true;
+                  that.game.state.start('status');
+                }
+              } else {
+                // single player VS-win
+                if (p.playerId == that.wb.blocktypes[group.model.t].player) {
+                  that.game.stateWinSuccess = true;
+                  that.game.state.start('status');
+                  that.game.statePlayerWin = p.playerId;
+                  that.game.score[p.playerId - 1] += 1;
+                }
               }
 
             }
 
             p.registerBlockTouch(group);
+            that.wb.registerBlockTouch(group);
           });
 
         // Player updates
@@ -250,7 +290,7 @@
 
     addBlock: function(player) {
       var sp, x, y,
-          gridsize=19;
+          gridsize=this.wb.gridsize;
 
       var sprite = this.game.players[0].sprite;
       var otherSprite = this.game.players[1].sprite;
@@ -265,7 +305,7 @@
       }
 
       x = Math.floor(sprite.body.x / gridsize);
-      y = Math.floor(sprite.body.y / gridsize + 1);
+      y = Math.floor((sprite.body.y + (sprite.body.velocity.y / 30)) / gridsize + 1);
 
       if(this.wb.canAddBlock(x,y)) {
 	     this.blocksound.play();

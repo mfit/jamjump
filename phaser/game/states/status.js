@@ -16,6 +16,12 @@ GameOver.prototype = {
       "YOU REACHED \n THE COMET \n WIN!" :
       "FELL INTO LAVA \n - YOU LOST ";
 
+    if (this.game.statePlayerWin > -1 ) {
+      // single player win
+      text += "\nPLAYER " + this.game.statePlayerWin + " WINS !";
+    }
+
+
     text +="\n (enter to continue)";
 
     this.titleText = this.game.add.text(this.game.world.centerX, 300, text, style);

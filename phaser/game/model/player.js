@@ -5,6 +5,7 @@ function JumpPlayer(state, sprite, playerId, controller) {
     this.sprite = sprite;
     this.controller = controller;
     this.playerId = playerId;
+    this.score = 0;
 
     this.lastUpdate = this.game.time.now;
 
@@ -77,7 +78,6 @@ JumpPlayer.prototype = {
         10    // offset-y
         );
     this.sprite.body.gravity.y = 1050;
-    console.log(this.sprite.body);
     this.sprite.allowGravity = true;
     this.fullSpeedTreshold = false; // to turn on , set value e.g. 300;
     this.fullSpeedCounter = 0;
@@ -88,7 +88,14 @@ JumpPlayer.prototype = {
 
     this.sprite.anchor.set(0.5, 0);
   },
-
+  getSpawnPosition: function() {
+    if (this.startPos) {
+        return [this.startPos[0], this.startPos[1]];
+    } else {
+        return [Math.random() * this.game.width,
+                Math.random() * (this.game.height / 2)];
+    }
+  },
   registerBlockTouch: function(block) {
     // called from phyics collision testing ...
     // console.log("touched");
