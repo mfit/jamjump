@@ -13,6 +13,7 @@ function JumpPlayer(state, sprite, playerId, controller) {
     this.BLOCKFART = 50;
     this.BLOCKCOST = 300;
     this.MAXBLOCKPOWER = 1000;
+    this.BLOCKPOWERGAIN = 1;
     this.NOREPEAT = 100;
     if (this.game.level === 3) {
         this.NOREPEAT = 200;
@@ -108,7 +109,7 @@ JumpPlayer.prototype = {
     this.lastUpdate = this.game.time.now;
 
     // Fill up blockpower
-    this.blockpower += time_passed;
+    this.blockpower += time_passed * this.BLOCKPOWERGAIN;
     if (this.blockpower > this.MAXBLOCKPOWER) {
         this.blockpower = this.MAXBLOCKPOWER;
     }
